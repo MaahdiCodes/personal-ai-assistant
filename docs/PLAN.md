@@ -1,8 +1,25 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** plan reviewed and open questions answered (§10). No code has been written yet.
+> **Status:** Phase 0 code is done and passes its PC tests (§7). Waiting on you: create the signing key, connect the phones, install, and run the on-phone tests.
 > **Last updated:** 2026-10-05
-> **Next step:** start Phase 0.
+> **Next step:** finish Phase 0 on the phones, then start Phase 1.
+
+### Status at a glance
+
+✅ done · 🧪 code done, phone check pending · 🔨 in progress · ⬜ not started
+
+| Phase | What it delivers | Status |
+|---|---|---|
+| Plan | Decisions, design, roadmap (this document) | ✅ |
+| 0. Foundation | Project, encrypted storage, safety checks, scripts | 🧪 Code + 43 PC tests done. Phone check pending (§7 "Phase 0 progress"). |
+| 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock | ⬜ |
+| 2. Message capture | Reading WhatsApp / Messenger / Gmail notifications, exclusions | ⬜ |
+| 3. AI suggestions | On-device AI turning messages into suggested tasks | ⬜ |
+| 4. Calendar + planning | Calendar sync, clashes, widget | ⬜ |
+| 5. Backups + hardening | Encrypted Google Drive backups, reliability | ⬜ |
+| 6. Combined task list | One list across both phones | ⬜ |
+
+**Git:** new work is pushed to the `develop` branch. It is merged into `main` once checked on the phones, so `main` always holds phone-verified code.
 
 ---
 
@@ -27,11 +44,11 @@
 | Platform | Android only, native **Kotlin + Jetpack Compose** | iOS doesn't let apps read other apps' notifications. The difficult parts (notification listener, exact alarms, background work) are native Android APIs. |
 | Phones | Same app on **Pixel 7 Pro (12 GB)** and **Poco X7 Pro (12 GB)**. Each phone has its own task list for now. A combined list comes later (Phase 6). | Both are daily phones, with different accounts |
 | Reading messages | Android **Notification Listener** | The only safe, legitimate way. No unofficial WhatsApp/Messenger clients: they risk an account ban and need a server. |
-| AI | On-device **Gemma 3n E2B** running in **LiteRT-LM**. Both phones have 12 GB RAM, so Phase 3 also tests the larger **Gemma 3n E4B**. Whichever meets the §7 targets at acceptable speed wins. Fallback: Gemma 3 1B. | Free and offline. E2B needs about 2 GB of memory, E4B about 3 GB. Your messages are mostly English, which these models handle well. |
+| AI | On-device AI running in **LiteRT-LM**, **smallest model first**. Start with **Gemma 3 1B** (about 0.5 GB). Move to **Gemma 3n E2B** (about 3 GB) only if 1B misses the §7 targets, and only with your OK. Mavick also works with no model at all (rules only). | Free and offline. You asked to keep storage and CPU low (§5.8), so model size is a budgeted decision, not a default. Your messages are mostly English, which these models handle best. |
 | Cloud AI | **None** | Free cloud tiers such as the Gemini API may use your data to improve their products, and human reviewers may read it |
 | Network | App has **no `INTERNET` permission**. A build check enforces this. | Android itself then makes uploading anything impossible |
 | Storage | Room + **SQLCipher**, with the database key protected by **Android Keystore** | Data is encrypted on the phone |
-| Install | Android Studio / ADB over USB. **One signing key for every build** installed on the phones. It is never in git and is backed up to Google Drive (§5.7). | No Play Store, no fees, no Play rules about notification access. A single key means debug and release builds can update each other without uninstalling. |
+| Install | ADB over USB, through `scripts\install.ps1`. Your everyday app is the **optimized release build** (`dev.maahdi.mavick`), signed with your own key. The key is never in git and is backed up to Google Drive (§5.7). The **debug build is a separate app** ("Mavick Debug", `dev.maahdi.mavick.debug`) with its own data, used only for development and tests. | No Play Store, no fees, no Play rules about notification access. Release builds run much faster than debug builds. Keeping debug separate means tests can never touch your real tasks. |
 | Backups | Encrypted backup file saved through Android's file picker to **Google Drive**. The Drive app does the upload. | Mavick still needs no internet permission, and Google only ever holds an encrypted file |
 | Task IDs | **UUIDs**, and deletes are **soft** (`deletedAt`) | Tasks from two phones or a backup can merge without ID clashes. This makes Phase 6 (combined list) an addition rather than a rewrite. |
 | Dependency injection | Manual (`AppContainer`), no Hilt | The app is small, so explicit wiring is easier to read |
@@ -164,14 +181,14 @@ Further rules:
 6. **Suggestion card:** [Add] [Edit] [Ignore] [Never from this chat]. Near-duplicates (same chat, similar title, same day) are merged.
 7. **Auto-add (later, Phase 4):** only if the eval numbers are good. It adds suggestions above a confidence threshold and shows an **[Undo]** notification.
 
-**Runtime**
-- A WorkManager job processes the queue one message at a time.
-- The model loads on first use and unloads after 5 minutes idle.
-- Processing pauses when battery is below 15% and not charging (configurable).
-- Expect a few seconds per message.
+**Runtime** (kept light, per §5.8)
+- A WorkManager job processes the queue one message at a time, on at most 2 CPU threads.
+- The model is loaded only while there is work, and unloaded 1 minute after the queue empties to free its memory.
+- Processing pauses while the battery is below 20% and not charging, while Battery Saver is on, or while the phone is warm (Android thermal status "moderate" or higher). It resumes automatically.
+- Expect a few seconds per message. The rule prefilter keeps the number of messages small.
 
 **Model install** (no network needed on the phone)
-1. On the PC, download the free Gemma 3n E2B `.litertlm` model from Hugging Face. You'll need to accept the Gemma terms.
+1. On the PC, download the free Gemma 3 1B `.litertlm` model from Hugging Face (Gemma 3n E2B only if approved, §2). You'll need to accept the Gemma terms.
 2. `scripts/push-model.ps1` copies it to the phone's Download folder.
 3. The app's **Import model** button checks the SHA-256 and copies the file into private storage.
 
@@ -203,19 +220,19 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 ### 5.6 Security checklist
 
 **Data leaving the phone**
-- [ ] No `INTERNET` or network-state permission. A Gradle check fails the build if any library adds one.
-- [ ] No analytics, crash-reporting or ad SDKs.
-- [ ] `allowBackup="false"` plus data-extraction rules that exclude everything, so nothing goes to Google cloud backup.
+- [x] No `INTERNET` or network-state permission. The manifest strips them, and a Gradle permission allow-list fails the build if any library adds any permission (Phase 0).
+- [x] No analytics, crash-reporting or ad SDKs.
+- [x] `allowBackup="false"` plus data-extraction rules that exclude everything, so nothing goes to Google cloud backup or phone-to-phone transfer (Phase 0).
 
 **Data on the phone**
-- [ ] SQLCipher database. Its 256-bit random passphrase is encrypted with a non-exportable Keystore AES-GCM key.
+- [x] SQLCipher database. Its 256-bit random key is encrypted with a non-exportable Keystore AES-GCM key and passed to SQLCipher as a raw key, so there is no slow key stretching (Phase 0; on-phone tests confirm it).
 - [ ] Fingerprint or device-PIN lock when the app opens and after 5 minutes in the background.
-- [ ] `FLAG_SECURE` on the whole app, so no screenshots and a blank preview in Recents.
+- [x] `FLAG_SECURE` on the whole app, so no screenshots and a blank preview in Recents (Phase 0).
 - [ ] Raw messages auto-deleted after **14 days** (configurable 1–90). Tasks are kept.
 
 **Code and keys**
-- [ ] Real messages are never committed to git. Private eval data lives in a git-ignored folder. Test fixtures use **fake messages sent between your two phones**.
-- [ ] All builds are signed with your own key. **Back up the keystore and its password** (§5.7). Losing them means you can't update the app without uninstalling it, which wipes its data.
+- [x] Real messages are never committed to git. Private eval data lives in a git-ignored folder (`/eval/private/` in `.gitignore`). Test fixtures use **fake messages sent between your two phones**.
+- [ ] Release builds are signed with your own key (debug builds are the separate "Mavick Debug" app). **Back up the keystore and its password** (§5.7). Losing them means you can't update the app without uninstalling it, which wipes its data.
 - [ ] Encrypted backups to Google Drive (§5.7).
 
 ### 5.7 Backups (Google Drive)
@@ -234,6 +251,22 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 - **Keep the password somewhere other than Drive**: a password manager (e.g. free Bitwarden) or a paper copy. That way one hacked Google account doesn't expose both.
 - Keep a second copy of the `.p12` file off the PC as well (e.g. a USB drive).
 - Make sure 2-Step Verification is on for that Google account.
+
+### 5.8 Phone resource budget (your requirement: never slow the phone down)
+
+| Resource | Budget | How it is enforced or checked |
+|---|---|---|
+| App size | Release APK **≤ 8 MB** (Phase 0: 3.3 MB) | The build fails above budget (`checkReleaseApkSize`). Raising a budget needs a deliberate change here. |
+| Code shipped | 64-bit ARM native code only, English resources only, unused code stripped (R8) | `abiFilters`, `localeFilters` and `isMinifyEnabled` in `app/build.gradle.kts` |
+| App data | Typically a few MB | Raw messages deleted after 14 days (§5.6). `usage.ps1` shows data + cache. |
+| AI model (Phase 3) | **Gemma 3 1B, about 0.5 GB**. E2B (about 3 GB) only with your OK. | Optional import. Mavick works without a model. |
+| Memory | The AI model is in memory only while it is processing | Unloaded 1 minute after the queue empties. `usage.ps1` shows memory (PSS). |
+| CPU at startup | One small database open, off the main thread, with no slow key stretching and no emoji-font loading | `DatabaseKeyRepository` (raw key) and the startup trimming in `AndroidManifest.xml` |
+| Background, Phases 0–1 | **Nothing runs** except reminder alarms at their exact times (Phase 1) | The release manifest declares 0 services. `usage.ps1` counts services, jobs and alarms. |
+| Background, Phase 2+ | The notification listener wakes only when a notification arrives. No polling, no wake locks. One daily cleanup job, run while charging. | `usage.ps1` plus Android's battery stats |
+| CPU for AI, Phase 3 | ≤ 2 threads, one message at a time. Pauses on low battery, Battery Saver, or a warm phone. | §5.3 Runtime. Measured on both phones. |
+
+**Rule:** every phase ends by running `.\scripts\usage.ps1` on both phones, and the numbers are recorded in this plan.
 
 ---
 
@@ -273,15 +306,29 @@ Times assume part-time work, with Claude writing most of the code.
 
 | Phase | Time | Scope | Done when |
 |---|---|---|---|
-| **0. Foundation** | 1–2 days | Kotlin/Compose project, Room + SQLCipher, version catalog, manual DI, "no INTERNET" build check, test setup (JUnit, Robolectric, coroutines-test). PowerShell scripts: `devices.ps1`, `install.ps1` (build + install on one or both phones), `test.ps1`, `logs.ps1`, `new-signing-key.ps1` (you run this one yourself, §5.7). | `scripts/test.ps1` passes. App installs and opens on both phones. Signing key is backed up to Drive with its password stored elsewhere. |
+| **0. Foundation** | 1–2 days | Kotlin/Compose project, Room + SQLCipher, version catalog, manual DI, permission allow-list and APK size checks, test setup (JUnit, Robolectric, coroutines-test). PowerShell scripts: `devices.ps1`, `install.ps1` (build + install on one or both phones), `test.ps1`, `logs.ps1`, `usage.ps1`, `new-signing-key.ps1` (you run this one yourself, §5.7). | `scripts/test.ps1` passes. App installs and opens on both phones, showing "Encrypted storage: Ready". On-phone tests pass on both. `usage.ps1` shows 0 background services, jobs and alarms. Signing key backed up to Drive, with its password stored elsewhere. |
 | **1. Tasks + reminders** | 1–2 wks | Today / Upcoming / Done screens, add/edit, quick-add with English date parsing ("pay rent on the 1st 10am"), **share target (Keep → Send → Assistant)**, exact reminders + actions, repeats, rescheduling, missed reminders, morning briefing, app lock, `FLAG_SECURE`. | On both phones, reminders fire within 1 min after 1 h+ with the screen off, with battery saver on, after a reboot and after a time-zone change. Date-parser and repeat tests pass. |
 | **2. Message capture** | 1–2 wks | Listener and parsers (WhatsApp with **multiple accounts per phone**, Messenger, Gmail, Keep reminders), account detection, noise filter, dedup, exclusion engine + UI (including per-account rules), pause, Inbox screen, retention cleanup, Health screen + HyperOS checklist, debug-only "save as test fixture". | 50 test messages sent between the phones, **to every WhatsApp account on each phone**, are captured with the right account and no duplicates. A test proves an excluded chat's text never reaches the database. The listener survives 48 h on the Poco. |
-| **3. AI suggestions** | 2–3 wks | Model import, prefilter, `GemmaExtractor`, validation, `WhenResolver` reuse, Suggestions inbox, "never from this chat", conversation context, **Keep Takeout import**, private eval set (100–200 of your real messages, labelled) + on-device eval runner, **E2B vs E4B comparison**. | Precision ≥ 85% and recall ≥ 70% on your eval set. ≤ 10 s per message on both phones. No noticeable battery drain over a normal day. |
+| **3. AI suggestions** | 2–3 wks | Model import, prefilter, `GemmaExtractor`, validation, `WhenResolver` reuse, Suggestions inbox, "never from this chat", conversation context, **Keep Takeout import**, private eval set (100–200 of your real messages, labelled) + on-device eval runner, **model choice: Gemma 3 1B first, E2B only if needed and approved**. | Precision ≥ 85% and recall ≥ 70% on your eval set. ≤ 10 s per message on both phones. No noticeable battery drain over a normal day. The phone stays cool, and `usage.ps1` is within §5.8. |
 | **4. Calendar + planning** | 1–2 wks | Write tasks/events to a calendar you choose (`CalendarContract`), read the calendar for clashes and the briefing, home-screen widget, Quick Settings tile, optional auto-add with Undo. | Accepted events appear in Google Calendar. The briefing shows clashes. |
 | **5. Backups + hardening** | 1–2 wks, then ongoing | **Encrypted backup to Google Drive + restore with merge** (§5.7), test whether Drive accepts automatic weekly overwrites, "ask my assistant" (keyword search first, on-device Q&A later), battery profiling, long-run reliability on HyperOS. | A backup made on the Pixel restores on the Poco with the correct merge. Weekly backups run automatically, or the fallback reminder is in place. |
 | **6. Combined task list** (later) | 1–2 wks | One task list shared across both phones. **Preferred design:** a shared, encrypted sync file in Google Drive, reusing the Phase 5 backup format and merge code. Each phone reads, merges and writes it. No internet permission is needed. Alternatives if Drive background access proves unreliable: a shared Google Calendar (dated items only), or Bluetooth sync when the phones are near each other. | A task added, edited, completed or deleted on one phone shows up correctly on the other, including when both phones changed the same task offline. |
 
 **Total:** about 8–11 weeks part-time to finish Phase 4, plus about 2–4 weeks for Phases 5–6. **Phase 1 is useful on its own** as your reminder app.
+
+**Phase 0 progress (2026-10-05)**
+
+| Item | Status |
+|---|---|
+| Project, encrypted database, home screen, scripts | ✅ Done |
+| PC tests + Android Lint | ✅ 43 tests passing (key handling, file format, converters, task queries, storage check, app safety). Lint: no issues. |
+| Permission allow-list | ✅ Debug and release request only the AndroidX-internal broadcast permission |
+| Release APK | ✅ 3.3 MB, signature verified (tested with a throwaway key, since deleted). R8 keeps the classes SQLCipher's native code needs. |
+| Release manifest | ✅ 1 screen, 0 services. Emoji-font loader and Room's cross-process service removed. |
+| Your signing key | ⏳ Run `.\scripts\new-signing-key.ps1`, then back it up (§5.7 B) |
+| Install on both phones | ⏳ `.\scripts\install.ps1` |
+| On-phone tests (real encryption hardware) | ⏳ `.\scripts\test.ps1 -OnPhone` |
+| Usage measured on both phones | ⏳ `.\scripts\usage.ps1`. Record the numbers here. |
 
 ---
 
@@ -309,7 +356,8 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | Can't tell which WhatsApp account a notification belongs to (multi-account), or HyperOS hides a cloned app's notifications | Medium | Verify early in Phase 2 with test messages. Worst case: messages are tagged "unknown account" and per-account rules fall back to chat rules. |
 | The Drive app won't accept background overwrites (weekly backups, Phase 6 sync) | Medium | Weekly one-tap "Back up now" reminder. For Phase 6, use one of the sync alternatives. |
 | AI suggests wrong tasks or misses some | Medium | You confirm every suggestion first. Eval set. Auto-add only after the numbers are good. |
-| Model too slow or uses too much memory | Low (both phones ≥ 8 GB RAM) | Gemma 3 1B fallback. Processing runs in the background only. |
+| AI model too big, slow or hot | Medium | Smallest model first (Gemma 3 1B, about 0.5 GB). Throttling (§5.3). `usage.ps1` measurements. E2B only with your OK. |
+| Newer libraries need a newer Android Studio (Compose 1.12+ needs compileSdk 37 and AGP 9.1) | Certain over time | Versions pinned in `gradle/libs.versions.toml`. Update Android Studio, then lift the pins together. |
 | A library adds the `INTERNET` permission | Low | The build check fails the build |
 | Signing key lost | Low | Back up the keystore and password (password manager + offline copy) |
 | Pixel 7 Pro security updates end **Oct 2027** | Certain | Fine until then. The Poco gets security updates until about early 2029. |
@@ -324,15 +372,16 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | Question | Answer | Effect on the plan |
 |---|---|---|
 | Combined task list across both phones? | Yes, later | Phase 6 added. UUID task IDs and soft deletes from Phase 1 onward. |
-| Poco RAM? | 12 GB | Both phones can try Gemma 3n E4B (Phase 3) |
+| Poco RAM? | 12 GB | Both phones could run larger models, but storage and CPU limits (§5.8) come first: Gemma 3 1B is tried first |
 | WhatsApp setup? | Regular WhatsApp, **multiple accounts on both phones** | `accountKey` on every message, per-account exclusion rules, verified in Phase 2 |
 | App name? | **Mavick** | Proposed package ID `dev.maahdi.mavick` |
 | Signing-key backup location? | **Google Drive** | §5.7 B. App-data backups also go to Drive (§5.7 A). |
+| Package ID? | `dev.maahdi.mavick` (debug: `dev.maahdi.mavick.debug`) | Used from Phase 0 |
+| Phone resource limits? | Storage and CPU must stay low, and the phone must never hang | §5.8 budgets, enforced by build checks. Smallest AI model first. Release build for daily use. |
 
-**Still open (not blocking Phase 0)**
+**Still open (not blocking)**
 
-1. **Confirm the package ID** `dev.maahdi.mavick`, or choose another, before Phase 0.
-2. **How are the multiple WhatsApp accounts set up on each phone?** WhatsApp's own account switcher, or a clone such as Xiaomi "Dual apps"? Phase 2 will verify this on the phones either way.
+1. **How are the multiple WhatsApp accounts set up on each phone?** WhatsApp's own account switcher, or a clone such as Xiaomi "Dual apps"? Phase 2 will verify this on the phones either way.
 
 ---
 
@@ -346,6 +395,7 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 - `JAVA_HOME` and `ANDROID_HOME` are not set. The scripts will set them for each run.
 - Neither phone has been connected over USB yet.
 - Google Drive for desktop and 7-Zip are not installed. Neither is needed: upload the signing key at drive.google.com.
+- **Toolchain** (pinned in `gradle/libs.versions.toml`): Gradle 9.2.1, AGP 9.0.1, Kotlin 2.3.20, KSP 2.3.12, Compose BOM 2026.06.01 (Compose 1.11), Room 2.8.5, SQLCipher 4.19.1, Robolectric 4.17. AGP 9.0 is the newest line this Android Studio can open. Compose 1.12+ would need Android Studio with AGP 9.1+ and SDK 37.
 
 ---
 
