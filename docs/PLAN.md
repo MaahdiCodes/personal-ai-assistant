@@ -1,14 +1,14 @@
-# Personal AI Assistant — Plan
+# Mavick — Personal AI Assistant — Plan
 
-> **Status:** plan saved for review. No code has been written yet.
+> **Status:** plan reviewed and open questions answered (§10). No code has been written yet.
 > **Last updated:** 2026-10-05
-> **Next step:** review this plan → answer the open questions (§10) → start Phase 0.
+> **Next step:** start Phase 0.
 
 ---
 
 ## 1. Goal
 
-A small, private Android app that:
+**Mavick** is a small, private Android app that:
 
 1. Reads incoming **WhatsApp**, **Messenger** and **Gmail** notifications, skipping the chats and keywords you exclude, plus **Google Keep** notes you send to it.
 2. Finds tasks, appointments and promises in them and **suggests** them as to-dos.
@@ -23,14 +23,17 @@ A small, private Android app that:
 
 | Decision | Choice | Why |
 |---|---|---|
+| Name | **Mavick**. Proposed package ID: `dev.maahdi.mavick` | The package ID can't change after the first install without moving data across through a backup (§5.7), so confirm it before Phase 0 |
 | Platform | Android only, native **Kotlin + Jetpack Compose** | iOS doesn't let apps read other apps' notifications. The difficult parts (notification listener, exact alarms, background work) are native Android APIs. |
-| Phones | Same app on **Pixel 7 Pro** and **Poco X7 Pro**. Each runs independently because each phone has different accounts. | Both are daily phones |
+| Phones | Same app on **Pixel 7 Pro (12 GB)** and **Poco X7 Pro (12 GB)**. Each phone has its own task list for now. A combined list comes later (Phase 6). | Both are daily phones, with different accounts |
 | Reading messages | Android **Notification Listener** | The only safe, legitimate way. No unofficial WhatsApp/Messenger clients: they risk an account ban and need a server. |
-| AI | On-device **Gemma 3n E2B** running in **LiteRT-LM**. Fallback: Gemma 3 1B. | Free and offline. Needs about 2 GB of memory. Your messages are mostly English, which it handles well. |
+| AI | On-device **Gemma 3n E2B** running in **LiteRT-LM**. Both phones have 12 GB RAM, so Phase 3 also tests the larger **Gemma 3n E4B**. Whichever meets the §7 targets at acceptable speed wins. Fallback: Gemma 3 1B. | Free and offline. E2B needs about 2 GB of memory, E4B about 3 GB. Your messages are mostly English, which these models handle well. |
 | Cloud AI | **None** | Free cloud tiers such as the Gemini API may use your data to improve their products, and human reviewers may read it |
 | Network | App has **no `INTERNET` permission**. A build check enforces this. | Android itself then makes uploading anything impossible |
 | Storage | Room + **SQLCipher**, with the database key protected by **Android Keystore** | Data is encrypted on the phone |
-| Install | Android Studio / ADB over USB, signed with your own key | No Play Store, no fees, no Play rules about notification access |
+| Install | Android Studio / ADB over USB. **One signing key for every build** installed on the phones. It is never in git and is backed up to Google Drive (§5.7). | No Play Store, no fees, no Play rules about notification access. A single key means debug and release builds can update each other without uninstalling. |
+| Backups | Encrypted backup file saved through Android's file picker to **Google Drive**. The Drive app does the upload. | Mavick still needs no internet permission, and Google only ever holds an encrypted file |
+| Task IDs | **UUIDs**, and deletes are **soft** (`deletedAt`) | Tasks from two phones or a backup can merge without ID clashes. This makes Phase 6 (combined list) an addition rather than a rewrite. |
 | Dependency injection | Manual (`AppContainer`), no Hilt | The app is small, so explicit wiring is easier to read |
 | Dates | The AI extracts the **phrase** ("next Thu 5pm"). **Deterministic Kotlin code** turns it into a date. | Small models are bad at date arithmetic. Code can be tested. The same parser serves quick-add (DRY). |
 | Android versions | minSdk **33** (Android 13); target/compile SDK **36** | Both phones run Android 15+. API 33 provides `USE_EXACT_ALARM`. |
@@ -41,7 +44,7 @@ A small, private Android app that:
 
 | Source | How | What we get | Limits |
 |---|---|---|---|
-| **WhatsApp** (`com.whatsapp`, `com.whatsapp.w4b`) | Notification listener, `MessagingStyle` | Sender, chat/group name, text, time. May include replies you send from the notification itself. | No messages you send in the app, no muted chats, no history before install, nothing from the chat that's open on screen |
+| **WhatsApp** (`com.whatsapp`) | Notification listener, `MessagingStyle` | Sender, chat/group name, text, time, and **which WhatsApp account** received it (several accounts per phone; see §5.1). May include replies you send from the notification itself. | No messages you send in the app, no muted chats, no history before install, nothing from the chat that's open on screen |
 | **Messenger** (`com.facebook.orca`) | Notification listener, `MessagingStyle` | Same as WhatsApp | Same as WhatsApp |
 | **Gmail** (`com.google.android.gm`) | Notification listener (`BigText` / `Inbox` styles) | Sender, subject, preview snippet, which account | Only emails Gmail notifies you about (usually Primary). Only the preview, not the full body. |
 | **Google Keep** (`com.google.android.keep`) | **No API for personal accounts** (the Keep API is for Google Workspace only). Three routes instead:<br>**(A)** Keep → ⋮ → *Send* → *Assistant* (share sheet), in Phase 1<br>**(B)** one-time import of a **Google Takeout** export, in Phase 3<br>**(C)** Keep's own reminder notifications are captured when they fire, in Phase 2 | Note title + text or checklist | The Takeout export may not include reminder times. The parser will be built against **your real export**. |
@@ -112,13 +115,16 @@ Tasks ◄──── manual quick-add / share from Keep ──┘
 6. **Store and enqueue:** save the message, then queue it for AI processing (Phase 3).
 
 Further rules:
-- **`conversationKey`:** the notification's shortcut ID when present, because it stays the same when a contact or group is renamed. Otherwise, the conversation title.
+- **`accountKey` (several WhatsApp accounts per phone):** every message is tagged with the account that received it, so two accounts never mix in dedup, exclusions or chat history. There are two possible setups, and which one each phone uses is **verified in Phase 2 with test messages**:
+  - **WhatsApp's own account switcher:** same package and same Android user. The account must be read from the notification itself (channel, group or sub-text). Exactly which field holds it is to be confirmed.
+  - **Xiaomi "Dual apps" / app clone:** same package, different Android user (`sbn.user`). We must confirm that HyperOS delivers the clone's notifications to Mavick's listener.
+- **`conversationKey`:** `accountKey` + the notification's shortcut ID when present, because the shortcut ID stays the same when a contact or group is renamed. Otherwise, `accountKey` + the conversation title.
 - **Listener health:** record connect/disconnect times and call `requestRebind` after a disconnect. Warn if nothing has arrived for N hours. The warning is configurable and silent at night.
 - **Logging:** message text is **never logged**.
 
 ### 5.2 Exclusions ("don't read these")
 
-- **Rule types:** app, chat (`conversationKey`), sender, keyword (case-insensitive, whole word).
+- **Rule types:** app, **account** (e.g. "nothing from my second WhatsApp number"), chat (`conversationKey`), sender, keyword (case-insensitive, whole word). Chat, sender and keyword rules can apply to every account or to just one.
 - **Per-app mode:** *read all except…* (default) or *read only…*.
 - **Global pause:** 1 hour / until tomorrow / until turned back on.
 - **Default keyword rules:** `OTP`, `password`, `PIN`, `verification code`. Android 15+ already hides OTPs from listener apps.
@@ -186,13 +192,13 @@ Further rules:
 
 | Table | Key fields |
 |---|---|
-| `task` | id, title, notes, dueAt (local date-time + zone), remindAt, repeatRule, priority, status (open/done/archived), source (manual/message/keep/share), sourceExcerpt, createdAt, updatedAt |
-| `message` | id, app, conversationKey, conversationTitle, sender, text, postedAt, isFromMe, dedupHash (unique), aiState (pending/skipped/done/failed) |
+| `task` | id (**UUID**), title, notes, dueAt (local date-time + zone), remindAt, repeatRule, priority, status (open/done/archived), source (manual/message/keep/share), sourceExcerpt, createdAt, updatedAt, **deletedAt** (soft delete) |
+| `message` | id, app, **accountKey**, conversationKey, conversationTitle, sender, text, postedAt, isFromMe, dedupHash (unique), aiState (pending/skipped/done/failed) |
 | `suggestion` | id, messageId, kind, title, whenText, resolvedAt, person, confidence, state (new/accepted/ignored) |
-| `exclusion_rule` | id, type (app/chat/sender/keyword), value, displayName, mode, lastMatchedAt |
+| `exclusion_rule` | id, type (app/account/chat/sender/keyword), value, **accountKey** (null = all accounts), displayName, mode, lastMatchedAt |
 | `health_event` | id, type, at (**no message content**) |
 
-Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a task.
+Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a task. Deleted tasks are hidden, then purged after 30 days. The tombstones let a restore or a later sync know the task was deleted rather than missing.
 
 ### 5.6 Security checklist
 
@@ -209,8 +215,25 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 
 **Code and keys**
 - [ ] Real messages are never committed to git. Private eval data lives in a git-ignored folder. Test fixtures use **fake messages sent between your two phones**.
-- [ ] Release builds are signed with your own key. **Back up the keystore and its password.** Losing them means you can't update the app without uninstalling it, which wipes its data.
-- [ ] Encrypted export/import for your own backups (Phase 5).
+- [ ] All builds are signed with your own key. **Back up the keystore and its password** (§5.7). Losing them means you can't update the app without uninstalling it, which wipes its data.
+- [ ] Encrypted backups to Google Drive (§5.7).
+
+### 5.7 Backups (Google Drive)
+
+**A. App data (tasks, exclusion rules, settings)** — Phase 5
+- **Back up now** encrypts a backup file inside Mavick, then opens Android's standard *Save to…* screen. You pick **Google Drive**, and the Drive app uploads the file. Mavick never touches the network.
+- **Encryption:** AES-256-GCM with a key derived from a **backup password you choose** (PBKDF2-HMAC-SHA256, high iteration count). Google only ever sees an encrypted file. If you forget this password, the backup can't be opened, by design.
+- **Contents:** tasks, including soft-deleted ones (tombstones), exclusion rules and settings, in a versioned format (`formatVersion` field) so old backups still import after app updates. **Raw messages are not included**: they are short-lived (14 days) and the most sensitive data.
+- **Restore** (new phone, reinstall, or a package-ID change): *Import* → pick the file from Drive → enter the password. The backup is **merged by task UUID, newest `updatedAt` wins**. This same merge code will power Phase 6.
+- **Automatic weekly backup:** Mavick keeps permission to the Drive file you picked and overwrites it weekly in the background. Phase 5 must first **verify on both phones that the Drive app accepts background overwrites**. If it doesn't, Mavick shows a weekly *"Back up now"* notification that needs one tap.
+- **Not used: Android's built-in Google backup.** The database key lives in the phone's secure hardware and can't move to another phone, so a copied database would be unreadable. That backup would also copy raw messages to the cloud.
+
+**B. Signing key** — Phase 0
+- `scripts/new-signing-key.ps1` creates `mavick-signing.p12` with a long random password. JDK 21 protects the key with AES-256. The script also writes a git-ignored `keystore.properties`. **You run this script yourself**, so the password never appears in a Claude session.
+- **Upload the `.p12` file to Google Drive** (drive.google.com → New → File upload). It's safe there because it's useless without the password.
+- **Keep the password somewhere other than Drive**: a password manager (e.g. free Bitwarden) or a paper copy. That way one hacked Google account doesn't expose both.
+- Keep a second copy of the `.p12` file off the PC as well (e.g. a USB drive).
+- Make sure 2-Step Verification is on for that Google account.
 
 ---
 
@@ -250,14 +273,15 @@ Times assume part-time work, with Claude writing most of the code.
 
 | Phase | Time | Scope | Done when |
 |---|---|---|---|
-| **0. Foundation** | 1–2 days | Kotlin/Compose project, Room + SQLCipher, version catalog, manual DI, "no INTERNET" build check, test setup (JUnit, Robolectric, coroutines-test). PowerShell scripts: `devices.ps1`, `install.ps1` (build + install on one or both phones), `test.ps1`, `logs.ps1`. | `scripts/test.ps1` passes. App installs and opens on both phones. |
+| **0. Foundation** | 1–2 days | Kotlin/Compose project, Room + SQLCipher, version catalog, manual DI, "no INTERNET" build check, test setup (JUnit, Robolectric, coroutines-test). PowerShell scripts: `devices.ps1`, `install.ps1` (build + install on one or both phones), `test.ps1`, `logs.ps1`, `new-signing-key.ps1` (you run this one yourself, §5.7). | `scripts/test.ps1` passes. App installs and opens on both phones. Signing key is backed up to Drive with its password stored elsewhere. |
 | **1. Tasks + reminders** | 1–2 wks | Today / Upcoming / Done screens, add/edit, quick-add with English date parsing ("pay rent on the 1st 10am"), **share target (Keep → Send → Assistant)**, exact reminders + actions, repeats, rescheduling, missed reminders, morning briefing, app lock, `FLAG_SECURE`. | On both phones, reminders fire within 1 min after 1 h+ with the screen off, with battery saver on, after a reboot and after a time-zone change. Date-parser and repeat tests pass. |
-| **2. Message capture** | 1–2 wks | Listener and parsers (WhatsApp, WhatsApp Business, Messenger, Gmail, Keep reminders), noise filter, dedup, exclusion engine + UI, pause, Inbox screen, retention cleanup, Health screen + HyperOS checklist, debug-only "save as test fixture". | 50 test messages sent between the phones are captured with no duplicates. A test proves an excluded chat's text never reaches the database. The listener survives 48 h on the Poco. |
-| **3. AI suggestions** | 2–3 wks | Model import, prefilter, `GemmaExtractor`, validation, `WhenResolver` reuse, Suggestions inbox, "never from this chat", conversation context, **Keep Takeout import**, private eval set (100–200 of your real messages, labelled) + on-device eval runner. | Precision ≥ 85% and recall ≥ 70% on your eval set. ≤ 10 s per message on both phones. No noticeable battery drain over a normal day. |
+| **2. Message capture** | 1–2 wks | Listener and parsers (WhatsApp with **multiple accounts per phone**, Messenger, Gmail, Keep reminders), account detection, noise filter, dedup, exclusion engine + UI (including per-account rules), pause, Inbox screen, retention cleanup, Health screen + HyperOS checklist, debug-only "save as test fixture". | 50 test messages sent between the phones, **to every WhatsApp account on each phone**, are captured with the right account and no duplicates. A test proves an excluded chat's text never reaches the database. The listener survives 48 h on the Poco. |
+| **3. AI suggestions** | 2–3 wks | Model import, prefilter, `GemmaExtractor`, validation, `WhenResolver` reuse, Suggestions inbox, "never from this chat", conversation context, **Keep Takeout import**, private eval set (100–200 of your real messages, labelled) + on-device eval runner, **E2B vs E4B comparison**. | Precision ≥ 85% and recall ≥ 70% on your eval set. ≤ 10 s per message on both phones. No noticeable battery drain over a normal day. |
 | **4. Calendar + planning** | 1–2 wks | Write tasks/events to a calendar you choose (`CalendarContract`), read the calendar for clashes and the briefing, home-screen widget, Quick Settings tile, optional auto-add with Undo. | Accepted events appear in Google Calendar. The briefing shows clashes. |
-| **5. Hardening + extras** | ongoing | Encrypted backup export/import, "ask my assistant" (keyword search first, on-device Q&A later), battery profiling, signed release build, long-run reliability on HyperOS. | — |
+| **5. Backups + hardening** | 1–2 wks, then ongoing | **Encrypted backup to Google Drive + restore with merge** (§5.7), test whether Drive accepts automatic weekly overwrites, "ask my assistant" (keyword search first, on-device Q&A later), battery profiling, long-run reliability on HyperOS. | A backup made on the Pixel restores on the Poco with the correct merge. Weekly backups run automatically, or the fallback reminder is in place. |
+| **6. Combined task list** (later) | 1–2 wks | One task list shared across both phones. **Preferred design:** a shared, encrypted sync file in Google Drive, reusing the Phase 5 backup format and merge code. Each phone reads, merges and writes it. No internet permission is needed. Alternatives if Drive background access proves unreliable: a shared Google Calendar (dated items only), or Bluetooth sync when the phones are near each other. | A task added, edited, completed or deleted on one phone shows up correctly on the other, including when both phones changed the same task offline. |
 
-**Total:** about 8–11 weeks part-time to finish Phase 4. **Phase 1 is useful on its own** as your reminder app.
+**Total:** about 8–11 weeks part-time to finish Phase 4, plus about 2–4 weeks for Phases 5–6. **Phase 1 is useful on its own** as your reminder app.
 
 ---
 
@@ -282,6 +306,8 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 |---|---|---|
 | HyperOS kills the listener or delays alarms on the Poco | High | Setup checklist, Health screen, rebind on disconnect, "no messages for N h" warning |
 | WhatsApp / Messenger / Gmail change their notification layout | Medium | Fixture tests per app. Generic fallback parser. |
+| Can't tell which WhatsApp account a notification belongs to (multi-account), or HyperOS hides a cloned app's notifications | Medium | Verify early in Phase 2 with test messages. Worst case: messages are tagged "unknown account" and per-account rules fall back to chat rules. |
+| The Drive app won't accept background overwrites (weekly backups, Phase 6 sync) | Medium | Weekly one-tap "Back up now" reminder. For Phase 6, use one of the sync alternatives. |
 | AI suggests wrong tasks or misses some | Medium | You confirm every suggestion first. Eval set. Auto-add only after the numbers are good. |
 | Model too slow or uses too much memory | Low (both phones ≥ 8 GB RAM) | Gemma 3 1B fallback. Processing runs in the background only. |
 | A library adds the `INTERNET` permission | Low | The build check fails the build |
@@ -291,13 +317,22 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 
 ---
 
-## 10. Open questions
+## 10. Decisions log and open questions
 
-1. **One combined task list across both phones?** Default: no, each phone is independent. A free option later: both phones write to the **same Google Calendar**. That requires the same Google account on both phones, and the app still needs no network permission.
-2. **Poco RAM: 8 GB or 12 GB?** Both work with Gemma 3n E2B. This only affects speed.
-3. **WhatsApp Business, or Xiaomi "Dual apps"** (two WhatsApps on one phone)? The parser and listener would need to handle the second copy.
-4. **App name and package ID**, e.g. `dev.maahdi.assistant`.
-5. **Where to keep the signing-key backup.**
+**Answered on 2026-10-05**
+
+| Question | Answer | Effect on the plan |
+|---|---|---|
+| Combined task list across both phones? | Yes, later | Phase 6 added. UUID task IDs and soft deletes from Phase 1 onward. |
+| Poco RAM? | 12 GB | Both phones can try Gemma 3n E4B (Phase 3) |
+| WhatsApp setup? | Regular WhatsApp, **multiple accounts on both phones** | `accountKey` on every message, per-account exclusion rules, verified in Phase 2 |
+| App name? | **Mavick** | Proposed package ID `dev.maahdi.mavick` |
+| Signing-key backup location? | **Google Drive** | §5.7 B. App-data backups also go to Drive (§5.7 A). |
+
+**Still open (not blocking Phase 0)**
+
+1. **Confirm the package ID** `dev.maahdi.mavick`, or choose another, before Phase 0.
+2. **How are the multiple WhatsApp accounts set up on each phone?** WhatsApp's own account switcher, or a clone such as Xiaomi "Dual apps"? Phase 2 will verify this on the phones either way.
 
 ---
 
@@ -310,6 +345,7 @@ Test fixtures are fake messages sent between your two phones, so no real convers
   - adb 36.0.2. It is **not on PATH**, so the scripts will use the full path.
 - `JAVA_HOME` and `ANDROID_HOME` are not set. The scripts will set them for each run.
 - Neither phone has been connected over USB yet.
+- Google Drive for desktop and 7-Zip are not installed. Neither is needed: upload the signing key at drive.google.com.
 
 ---
 
