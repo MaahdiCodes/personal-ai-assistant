@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Mavick must never reach the network: messages stay on the phone. These lines strip the
+        permissions even if a library asks for them, and the build's permission check
+        (app/build.gradle.kts) fails if anything else sneaks in.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
+
+    <!--
+        allowBackup=false keeps Mavick out of Google cloud backups. dataExtractionRules also
+        blocks phone-to-phone transfer, which allowBackup alone does not cover on Android 12+.
+    -->
+    <application
+        android:name=".MavickApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Mavick">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Phone-friendly trimming of what libraries add (docs/PLAN.md §5.8). -->
+
+        <!-- Room's cross-process service: Mavick is one process, so it is never needed. -->
+        <service
+            android:name="androidx.room.MultiInstanceInvalidationService"
+            tools:node="remove" />
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <!-- Would load an emoji font at every launch; Android 13+ already ships current emoji. -->
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                tools:node="remove" />
+        </provider>
+    </application>
+</manifest>

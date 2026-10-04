@@ -1,0 +1,19 @@
+# Gradle / Android Studio
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing secrets: created by scripts/new-signing-key.ps1, never committed
+keystore.properties
+*.p12
+*.jks
+*.keystore
+
+# Real messages used for AI evaluation (Phase 3) stay on this PC only
+/eval/private/

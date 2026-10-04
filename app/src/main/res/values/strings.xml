@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mavick</string>
+    <string name="home_subtitle">Phase 0 · foundation</string>
+
+    <string name="status_storage">Encrypted storage</string>
+    <string name="status_storage_checking">Checking…</string>
+    <string name="status_storage_ready">Ready</string>
+
+    <string name="status_internet">Internet access</string>
+    <string name="status_internet_none">None, by design</string>
+    <string name="status_internet_present">Present. This should never happen.</string>
+
+    <string name="status_background">Background activity</string>
+    <string name="status_background_none">None</string>
+
+    <string name="version_label">Version %1$s (%2$s build)</string>
+    <string name="build_release">release</string>
+    <string name="build_debug">debug</string>
+</resources>

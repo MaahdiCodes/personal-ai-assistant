@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The debug build is a separate app, so give it a name you can tell apart. -->
+    <string name="app_name">Mavick Debug</string>
+</resources>
