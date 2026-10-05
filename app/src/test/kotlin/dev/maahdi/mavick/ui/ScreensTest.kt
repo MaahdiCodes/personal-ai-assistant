@@ -111,12 +111,14 @@ class ScreensTest {
                 onNewTask = {},
                 onOpenSettings = {},
                 onOpenInbox = {},
+                onOpenSuggestions = {},
                 notificationsBlocked = false,
                 onFixNotifications = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
 
+        compose.onNodeWithText("Mavick found", substring = true).assertDoesNotExist()
         compose.onNodeWithText("Overdue").assertExists()
         compose.onNodeWithText("Late report").assertExists()
         compose.onNodeWithText("Buy milk").assertExists()
@@ -126,6 +128,34 @@ class ScreensTest {
 
         compose.onNodeWithText("Dentist").assertExists()
         compose.onNodeWithText("Buy milk").assertDoesNotExist()
+    }
+
+    @Test
+    fun `waiting suggestions show above the list and open with Review`() {
+        var opened = 0
+        val state = TasksUiState.build(open = emptyList(), done = emptyList(), today = today, workDays = DEFAULT_WORK_DAYS, suggestionsWaiting = 3)
+        compose.setContent {
+            TasksScreen(
+                state = state,
+                use24Hour = true,
+                preview = { parser.parse(it, MONDAY_10AM) },
+                onQuickAdd = { true },
+                onToggleDone = {},
+                onOpenTask = {},
+                onNewTask = {},
+                onOpenSettings = {},
+                onOpenInbox = {},
+                onOpenSuggestions = { opened++ },
+                notificationsBlocked = false,
+                onFixNotifications = {},
+                snackbarHostState = SnackbarHostState(),
+            )
+        }
+
+        compose.onNodeWithText("Mavick found 3 possible tasks in your messages.").assertExists()
+        compose.onNodeWithText("Review").performClick()
+
+        assertThat(opened).isEqualTo(1)
     }
 
     @Test

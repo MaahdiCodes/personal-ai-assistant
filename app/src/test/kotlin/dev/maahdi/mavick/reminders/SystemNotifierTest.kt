@@ -86,6 +86,41 @@ class SystemNotifierTest {
     }
 
     @Test
+    fun `the briefing mentions suggested tasks waiting`() {
+        notifier.showBriefing(Briefing(overdue = emptyList(), today = listOf(task(title = "Pay rent")), suggestionsWaiting = 2))
+
+        val notification = posted(SystemNotifier.BRIEFING_TAG, SystemNotifier.BRIEFING_NOTIFICATION_ID)!!
+        assertThat(notification.text(Notification.EXTRA_TEXT)).isEqualTo("1 task due today · 2 suggested tasks to review")
+    }
+
+    @Test
+    fun `waiting suggestions get one quiet notification, private on the lock screen, that opens them`() {
+        notifier.showSuggestions(3, listOf("Pay the rent", "Bring the cake"))
+
+        val notification = posted(SystemNotifier.SUGGESTIONS_TAG, SystemNotifier.SUGGESTIONS_NOTIFICATION_ID)!!
+        assertThat(notification.channelId).isEqualTo(SystemNotifier.CHANNEL_SUGGESTIONS)
+        assertThat(manager.getNotificationChannel(SystemNotifier.CHANNEL_SUGGESTIONS).importance).isEqualTo(NotificationManager.IMPORTANCE_LOW)
+        assertThat(notification.text(Notification.EXTRA_TITLE)).isEqualTo("3 suggested tasks to review")
+        assertThat(notification.text(Notification.EXTRA_TEXT)).isEqualTo("Pay the rent")
+        assertThat(notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)!!.map { it.toString() })
+            .containsExactly("Pay the rent", "Bring the cake").inOrder()
+        assertThat(notification.visibility).isEqualTo(Notification.VISIBILITY_PRIVATE)
+        assertThat(notification.publicVersion.text(Notification.EXTRA_TITLE)).isEqualTo("Mavick suggestions")
+        assertThat(shadowOf(notification.contentIntent).savedIntent.action).isEqualTo(ReminderIntents.ACTION_OPEN_SUGGESTIONS)
+    }
+
+    @Test
+    fun `more suggestions replace the notification, and none left removes it`() {
+        notifier.showSuggestions(1, listOf("Pay the rent"))
+        notifier.showSuggestions(2, listOf("Bring the cake", "Pay the rent"))
+        assertThat(shadowOf(manager).allNotifications).hasSize(1)
+
+        notifier.showSuggestions(0, emptyList())
+
+        assertThat(posted(SystemNotifier.SUGGESTIONS_TAG, SystemNotifier.SUGGESTIONS_NOTIFICATION_ID)).isNull()
+    }
+
+    @Test
     fun `reminders use a high-importance channel so they pop up`() {
         notifier.createChannels()
 

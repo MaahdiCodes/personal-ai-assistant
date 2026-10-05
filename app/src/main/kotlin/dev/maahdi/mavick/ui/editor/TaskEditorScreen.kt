@@ -67,7 +67,7 @@ import java.util.Locale
 fun EditorRoute(container: AppContainer, destination: Destination.Editor, onClose: () -> Unit) {
     val viewModel: EditorViewModel = viewModel(
         key = "editor-${destination.sessionId}",
-        factory = EditorViewModel.factory(container, destination.taskId, destination.draft),
+        factory = EditorViewModel.factory(container, destination.taskId, destination.draft, destination.suggestionId),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by container.settings.settings.collectAsStateWithLifecycle()

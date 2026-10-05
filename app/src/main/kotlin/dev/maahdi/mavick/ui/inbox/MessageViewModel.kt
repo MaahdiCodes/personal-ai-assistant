@@ -8,8 +8,7 @@ import dev.maahdi.mavick.AppContainer
 import dev.maahdi.mavick.data.message.MessageEntity
 import dev.maahdi.mavick.data.message.MessageRepository
 import dev.maahdi.mavick.data.rules.ExclusionRepository
-import dev.maahdi.mavick.data.rules.RuleEffect
-import dev.maahdi.mavick.data.rules.RuleType
+import dev.maahdi.mavick.data.rules.NeverReadChat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,15 +48,11 @@ class MessageViewModel(
         }
     }
 
-    /**
-     * Adds a "Never read" rule for this message's chat (by its key, so a rename doesn't undo it),
-     * deletes the chat's saved messages, then calls [onDone].
-     */
+    /** "Never read this chat" for this message's chat ([NeverReadChat]), then calls [onDone]. */
     fun neverReadChat(chatName: String, onDone: () -> Unit) {
         val message = mutableState.value.message ?: return
         viewModelScope.launch {
-            openExclusions().add(RuleType.CHAT, RuleEffect.EXCLUDE, message.conversationKey, chatName, message.app, message.accountKey)
-            openMessages().deleteConversation(message.app, message.accountKey, message.conversationKey)
+            NeverReadChat.apply(openExclusions(), openMessages(), message.app, message.accountKey, message.conversationKey, chatName)
             onDone()
         }
     }

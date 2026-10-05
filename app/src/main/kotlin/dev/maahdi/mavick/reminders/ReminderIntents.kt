@@ -17,6 +17,9 @@ object ReminderIntents {
     /** Opens Settings, where the Health section is (from a reading warning). */
     const val ACTION_OPEN_SETTINGS = "dev.maahdi.mavick.action.OPEN_SETTINGS"
 
+    /** Opens the suggested tasks (from the suggestions notification or the briefing). */
+    const val ACTION_OPEN_SUGGESTIONS = "dev.maahdi.mavick.action.OPEN_SUGGESTIONS"
+
     private const val SCHEME = "mavick"
     private const val TASK_HOST = "task"
 

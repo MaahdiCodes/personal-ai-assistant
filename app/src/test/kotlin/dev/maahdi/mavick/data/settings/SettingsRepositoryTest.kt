@@ -75,6 +75,15 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `suggestions are on at first, and turning them off survives a restart`() {
+        assertThat(SettingsRepository(preferences).current.suggestionsEnabled).isTrue()
+
+        SettingsRepository(preferences).update { it.copy(suggestionsEnabled = false) }
+
+        assertThat(SettingsRepository(preferences).current.suggestionsEnabled).isFalse()
+    }
+
+    @Test
     fun `a pause until resumed survives a restart, and resuming clears it`() {
         val repository = SettingsRepository(preferences)
         repository.update { it.copy(capturePause = CapturePause.UntilResumed) }

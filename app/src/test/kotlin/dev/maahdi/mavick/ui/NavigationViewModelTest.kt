@@ -48,6 +48,18 @@ class NavigationViewModelTest {
     }
 
     @Test
+    fun `a suggestion's Edit opens an editor that knows the suggestion, over the list`() {
+        navigation.openSuggestions()
+        navigation.openEditor(draft = TaskDraft(title = "Send the form"), suggestionId = "s1")
+
+        val editor = navigation.current as Destination.Editor
+        assertThat(editor.suggestionId).isEqualTo("s1")
+        assertThat(editor.draft!!.title).isEqualTo("Send the form")
+        navigation.back()
+        assertThat(navigation.current).isEqualTo(Destination.Suggestions)
+    }
+
+    @Test
     fun `an editor opened from the app returns to the app, one from a share returns to the other app`() {
         navigation.openEditor()
         assertThat(navigation.finishAfterEditor).isFalse()

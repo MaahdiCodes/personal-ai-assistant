@@ -12,8 +12,16 @@ sealed interface Destination {
 
     data object Settings : Destination
 
-    /** [sessionId] gives each opened editor its own state, even for the same task. */
-    data class Editor(val sessionId: Long, val taskId: String? = null, val draft: TaskDraft? = null) : Destination
+    /**
+     * [sessionId] gives each opened editor its own state, even for the same task. [suggestionId]:
+     * the draft came from that suggestion, which counts as added once the task is saved.
+     */
+    data class Editor(
+        val sessionId: Long,
+        val taskId: String? = null,
+        val draft: TaskDraft? = null,
+        val suggestionId: String? = null,
+    ) : Destination
 
     /** Messages read from notifications (Phase 2). */
     data object Inbox : Destination
@@ -22,6 +30,9 @@ sealed interface Destination {
 
     /** What Mavick reads: app switches, "Never read" and "Only read" rules, the pause. */
     data object Reading : Destination
+
+    /** Tasks found in messages, waiting for you (Phase 3). */
+    data object Suggestions : Destination
 }
 
 /**
@@ -48,10 +59,12 @@ class NavigationViewModel : ViewModel() {
 
     fun openReading() = push(Destination.Reading)
 
+    fun openSuggestions() = push(Destination.Suggestions)
+
     /** Opens an editor; an editor already open is replaced, so only one exists at a time. */
-    fun openEditor(taskId: String? = null, draft: TaskDraft? = null, fromShare: Boolean = false) {
+    fun openEditor(taskId: String? = null, draft: TaskDraft? = null, fromShare: Boolean = false, suggestionId: String? = null) {
         if (current is Destination.Editor) backStack.removeAt(backStack.lastIndex)
-        backStack.add(Destination.Editor(nextSessionId++, taskId, draft))
+        backStack.add(Destination.Editor(nextSessionId++, taskId, draft, suggestionId))
         finishAfterEditor = fromShare
     }
 

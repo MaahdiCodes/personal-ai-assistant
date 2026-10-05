@@ -12,7 +12,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,7 +27,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,17 +86,14 @@ fun MessageScreen(
     }
 
     if (confirmNeverRead && message != null) {
-        AlertDialog(
-            onDismissRequest = { confirmNeverRead = false },
-            title = { Text(stringResource(R.string.never_read_confirm_title, chatName(message))) },
-            text = { Text(pluralStringResource(R.plurals.never_read_confirm_text, state.chatMessageCount, state.chatMessageCount)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmNeverRead = false
-                    onNeverReadChat(message)
-                }) { Text(stringResource(R.string.never_read_confirm)) }
+        NeverReadChatDialog(
+            chatName = chatName(message),
+            messageCount = state.chatMessageCount,
+            onConfirm = {
+                confirmNeverRead = false
+                onNeverReadChat(message)
             },
-            dismissButton = { TextButton(onClick = { confirmNeverRead = false }) { Text(stringResource(R.string.dialog_cancel)) } },
+            onDismiss = { confirmNeverRead = false },
         )
     }
 }
@@ -121,16 +115,4 @@ private fun completenessNote(message: MessageEntity): String? = when {
     message.app == SourceApp.GMAIL -> stringResource(R.string.gmail_preview_note)
     message.cutShort -> stringResource(R.string.cut_short_note, appName(message.app))
     else -> null
-}
-
-/** The first line of a task's notes: where the message came from. */
-@Composable
-fun originLine(message: MessageEntity): String {
-    val app = appName(message.app)
-    return when {
-        message.isFromMe -> stringResource(R.string.origin_you, chatName(message), app)
-        message.sender == null -> stringResource(R.string.origin_app, app)
-        message.isGroup -> stringResource(R.string.origin_group, message.sender, chatName(message), app)
-        else -> stringResource(R.string.origin_person, message.sender, app)
-    }
 }

@@ -18,7 +18,7 @@ import java.time.Clock
 import java.time.LocalDate
 
 /**
- * Android notifications for reminders, the morning briefing and reading warnings.
+ * Android notifications for reminders, the morning briefing, reading warnings and suggested tasks.
  *
  * Privacy: on the lock screen only "Mavick reminder" shows; task titles appear once the phone is
  * unlocked. The buttons also need the phone unlocked before they act.
@@ -47,9 +47,58 @@ class SystemNotifier(
                     context.getString(R.string.channel_health),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply { description = context.getString(R.string.channel_health_description) },
+                // Quiet: no sound or pop-up. Suggestions can wait until you look.
+                NotificationChannel(
+                    CHANNEL_SUGGESTIONS,
+                    context.getString(R.string.channel_suggestions),
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply { description = context.getString(R.string.channel_suggestions_description) },
             ),
         )
     }
+
+    /**
+     * Suggested tasks are waiting: one quiet notification, replaced as more arrive. [titles] are
+     * the newest; on the lock screen only "Mavick suggestions" shows. Tapping opens the list.
+     */
+    fun showSuggestions(count: Int, titles: List<String>) {
+        if (count <= 0) {
+            cancelSuggestions()
+            return
+        }
+        createChannels()
+        val summary = context.resources.getQuantityString(R.plurals.suggestions_waiting, count, count)
+        val style = Notification.InboxStyle().setSummaryText(summary)
+        titles.take(MAX_SUGGESTION_LINES).forEach { style.addLine(it) }
+        val lockScreenVersion = Notification.Builder(context, CHANNEL_SUGGESTIONS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.suggestions_public_title))
+            .build()
+        val notification = Notification.Builder(context, CHANNEL_SUGGESTIONS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(summary)
+            .setContentText(titles.firstOrNull().orEmpty())
+            .setStyle(style)
+            .setNumber(count)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+            .setPublicVersion(lockScreenVersion)
+            .setOnlyAlertOnce(true)
+            .setAutoCancel(true)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    context,
+                    0,
+                    Intent(context, MainActivity::class.java)
+                        .setAction(ReminderIntents.ACTION_OPEN_SUGGESTIONS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            .build()
+        manager.notify(SUGGESTIONS_TAG, SUGGESTIONS_NOTIFICATION_ID, notification)
+    }
+
+    fun cancelSuggestions() = manager.cancel(SUGGESTIONS_TAG, SUGGESTIONS_NOTIFICATION_ID)
 
     /** Message reading stopped or went quiet. Tapping opens Settings, where Health is. */
     fun showReadingWarning(state: ReadingState) {
@@ -115,6 +164,7 @@ class SystemNotifier(
         val summary = listOfNotNull(
             briefing.today.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_due_today, it, it) },
             briefing.overdue.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_overdue, it, it) },
+            briefing.suggestionsWaiting.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.suggestions_waiting, it, it) },
         ).joinToString(" · ")
         val use24Hour = DateFormat.is24HourFormat(context)
         val lines = briefing.overdue.map { context.getString(R.string.briefing_overdue_line, it.title) } +
@@ -175,11 +225,15 @@ class SystemNotifier(
         const val CHANNEL_REMINDERS = "reminders"
         const val CHANNEL_BRIEFING = "briefing"
         const val CHANNEL_HEALTH = "health"
+        const val CHANNEL_SUGGESTIONS = "suggestions"
         const val REMINDER_NOTIFICATION_ID = 1
         const val BRIEFING_NOTIFICATION_ID = 2
         const val HEALTH_NOTIFICATION_ID = 3
+        const val SUGGESTIONS_NOTIFICATION_ID = 4
         const val BRIEFING_TAG = "briefing"
         const val HEALTH_TAG = "health"
+        const val SUGGESTIONS_TAG = "suggestions"
         private const val MAX_BRIEFING_LINES = 6
+        private const val MAX_SUGGESTION_LINES = 5
     }
 }

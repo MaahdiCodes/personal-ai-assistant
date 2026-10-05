@@ -4,6 +4,16 @@ import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.SystemClock
+import android.os.storage.StorageManager
+import dev.maahdi.mavick.ai.AiStatusStore
+import dev.maahdi.mavick.ai.AndroidDeviceConditions
+import dev.maahdi.mavick.ai.LiteRtLmModel
+import dev.maahdi.mavick.ai.ModelHost
+import dev.maahdi.mavick.ai.ModelManager
+import dev.maahdi.mavick.ai.ModelStore
+import dev.maahdi.mavick.ai.RuleExtractor
+import dev.maahdi.mavick.ai.SuggestionQueue
+import dev.maahdi.mavick.ai.SuggestionWorker
 import dev.maahdi.mavick.capture.CaptureChores
 import dev.maahdi.mavick.capture.CaptureStatusStore
 import dev.maahdi.mavick.capture.MavickNotificationListener
@@ -15,9 +25,11 @@ import dev.maahdi.mavick.data.rules.ExclusionRepository
 import dev.maahdi.mavick.data.security.AndroidKeystoreKeyWrapper
 import dev.maahdi.mavick.data.security.DatabaseKeyRepository
 import dev.maahdi.mavick.data.settings.SettingsRepository
+import dev.maahdi.mavick.data.suggestion.SuggestionRepository
 import dev.maahdi.mavick.data.task.TaskRepository
 import dev.maahdi.mavick.health.StorageHealthCheck
 import dev.maahdi.mavick.reminders.AlarmReminderScheduler
+import dev.maahdi.mavick.reminders.DailyChores
 import dev.maahdi.mavick.reminders.ReminderEngine
 import dev.maahdi.mavick.reminders.ReminderScheduler
 import dev.maahdi.mavick.reminders.SystemNotifier
@@ -76,6 +88,8 @@ class AppContainer(context: Context) {
 
     val capture: MessageCapture by lazy { MessageCapture(messages, exclusions, settings, captureStatus, clock) }
 
+    val suggestions: SuggestionRepository by lazy { SuggestionRepository(database.suggestionDao(), clock) }
+
     /** The task repository for screens, opened off the main thread (a Keystore operation). */
     suspend fun openTasks(): TaskRepository = offMain { tasks }
 
@@ -83,12 +97,101 @@ class AppContainer(context: Context) {
 
     suspend fun openExclusions(): ExclusionRepository = offMain { exclusions }
 
+    suspend fun openSuggestions(): SuggestionRepository = offMain { suggestions }
+
+    /** Counts and times about suggestions; no content. */
+    val aiStatus: AiStatusStore by lazy {
+        AiStatusStore(appContext.getSharedPreferences(AiStatusStore.FILE_NAME, Context.MODE_PRIVATE))
+    }
+
+    /** The imported AI model, where no backup reaches. */
+    val modelStore: ModelStore by lazy {
+        val storage = appContext.getSystemService(StorageManager::class.java)
+        ModelStore(
+            directory = File(appContext.noBackupFilesDir, MODEL_DIRECTORY),
+            freeBytes = { storage.getAllocatableBytes(storage.getUuidForPath(appContext.noBackupFilesDir)) },
+        )
+    }
+
+    /** The runtime's prepared weights: in the cache, which Android may clear when space is short. */
+    private val runtimeCacheDir: File get() = File(appContext.cacheDir, MODEL_CACHE_DIRECTORY)
+
+    val modelHost: ModelHost by lazy {
+        ModelHost(
+            store = modelStore,
+            status = aiStatus,
+            loader = { file -> LiteRtLmModel.load(file, runtimeCacheDir) },
+            clock = clock,
+            elapsedMillis = SystemClock::elapsedRealtime,
+        )
+    }
+
+    /** The one low-priority thread all AI work runs on. */
+    private val aiDispatcher by lazy { SuggestionWorker.lowPriorityThread() }
+
+    /** Import, check and remove the model, from Settings. */
+    val modelManager: ModelManager by lazy {
+        ModelManager(
+            store = modelStore,
+            host = modelHost,
+            status = aiStatus,
+            runtimeCacheDir = runtimeCacheDir,
+            aiDispatcher = aiDispatcher,
+            wakeQueue = { suggestionWorker.wake() },
+            clock = clock,
+            elapsedMillis = SystemClock::elapsedRealtime,
+        )
+    }
+
+    private val suggestionQueue by lazy {
+        SuggestionQueue(
+            messages = messages,
+            suggestions = suggestions,
+            rules = exclusions,
+            settings = settings,
+            modelHost = modelHost,
+            ruleExtractor = RuleExtractor(::whenParser),
+            conditions = AndroidDeviceConditions(appContext),
+            status = aiStatus,
+            whenParser = ::whenParser,
+            clock = clock,
+        )
+    }
+
+    /** Looks for tasks in new messages, on a low-priority background thread (Phase 3). */
+    val suggestionWorker: SuggestionWorker by lazy {
+        SuggestionWorker(
+            // Lambdas, not references: the queue (and the database it opens) is made on the AI
+            // thread at its first run, never on the main thread that wakes it.
+            process = { suggestionQueue.processPending() },
+            unload = { modelHost.unload() },
+            onSaved = { showSuggestionsNotification() },
+            dispatcher = aiDispatcher,
+        )
+    }
+
+    /** Updates the suggestions notification to what is waiting now. */
+    suspend fun showSuggestionsNotification() {
+        notifier.showSuggestions(suggestions.countNew(), suggestions.newTitles())
+    }
+
     private val captureChores by lazy {
         CaptureChores(messages, healthEvents, settings, captureStatus, ::hasNotificationAccess, notifier::showReadingWarning, clock)
     }
 
+    /** The daily alarm's chores: message reading's, then another chance for messages left waiting. */
+    private val dailyChores = object : DailyChores {
+        override suspend fun cleanUp() = captureChores.cleanUp()
+
+        override suspend fun daily() {
+            captureChores.daily()
+            // Messages left waiting (paused for the battery, say) get another chance each morning.
+            suggestionWorker.wake()
+        }
+    }
+
     val reminderEngine: ReminderEngine by lazy {
-        ReminderEngine(tasks, notifier, reminderScheduler, settings, clock, captureChores)
+        ReminderEngine(tasks, notifier, reminderScheduler, settings, clock, dailyChores, countSuggestions = { suggestions.countNew() })
     }
 
     val appLock: AppLock by lazy {
@@ -114,5 +217,7 @@ class AppContainer(context: Context) {
     private companion object {
         const val DATABASE_KEY_FILE_NAME = "database.key"
         const val DATABASE_KEY_ALIAS = "mavick.database.key-wrapper"
+        const val MODEL_DIRECTORY = "models"
+        const val MODEL_CACHE_DIRECTORY = "litertlm"
     }
 }

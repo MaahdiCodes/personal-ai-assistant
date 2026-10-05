@@ -5,10 +5,17 @@ import android.app.AlarmManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.PowerManager
 import android.text.format.DateFormat
+import android.text.format.Formatter
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,10 +25,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.maahdi.mavick.AppContainer
+import dev.maahdi.mavick.R
 import dev.maahdi.mavick.capture.ListenerRestart
 import dev.maahdi.mavick.capture.ReadingHealth
 import dev.maahdi.mavick.data.health.HealthEventType
@@ -29,6 +39,7 @@ import dev.maahdi.mavick.data.settings.AppSettings
 import dev.maahdi.mavick.health.StorageStatus
 import dev.maahdi.mavick.security.canAuthenticate
 import dev.maahdi.mavick.ui.PhoneSettings
+import dev.maahdi.mavick.ui.PickedFile
 import java.time.Duration
 import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
@@ -41,12 +52,17 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
+    val aiViewModel: AiSettingsViewModel = viewModel(factory = AiSettingsViewModel.factory(container))
+    val ai by aiViewModel.state.collectAsStateWithLifecycle()
     var health by remember { mutableStateOf(readHealth(context, container)) }
     var storage by remember { mutableStateOf<StorageStatus>(StorageStatus.Checking) }
     var disconnects by remember { mutableIntStateOf(0) }
+    // The model file picked last, offered for deletion once Mavick has its own copy.
+    var pickedModel by remember { mutableStateOf<Uri?>(null) }
     LifecycleResumeEffect(Unit) {
         // Re-read when coming back from Android's settings, where the user may have fixed something.
         health = readHealth(context, container)
+        aiViewModel.refresh()
         onPauseOrDispose { }
     }
     LaunchedEffect(Unit) {
@@ -54,15 +70,27 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
         disconnects = countRecentDisconnects(container)
     }
     BackHandler(onBack = onBack)
+    val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val file = PickedFile.from(context.contentResolver, uri)
+            pickedModel = uri
+            aiViewModel.import(file.name, file.sizeBytes, file::open)
+        }
+    }
 
     SettingsScreen(
         settings = settings,
         health = health.copy(storage = storage, disconnectsThisWeek = disconnects),
+        ai = ai,
         now = Instant.now(container.clock()),
+        zone = container.clock().zone,
         use24Hour = DateFormat.is24HourFormat(context),
         onChange = { change: (AppSettings) -> AppSettings ->
+            val wasSuggesting = container.settings.current.suggestionsEnabled
             container.settings.update(change)
             container.reminderEngine.scheduleDailyAlarm()
+            // Turned on: look at the messages waiting since.
+            if (!wasSuggesting && container.settings.current.suggestionsEnabled) container.suggestionWorker.wake()
         },
         onFixNotifications = { PhoneSettings.open(context, PhoneSettings.notifications(context)) },
         onFixBattery = { PhoneSettings.open(context, PhoneSettings.battery()) },
@@ -74,7 +102,48 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
         onOpenAutostart = { PhoneSettings.open(context, PhoneSettings.xiaomiAutostart()) },
         onOpenReading = onOpenReading,
         onDeleteAllMessages = { scope.launch { container.openMessages().deleteAll() } },
+        // Any file: phones don't know a type for .litertlm. The import checks the file itself.
+        onImportModel = { pickModel.launch(arrayOf("*/*")) },
+        onCheckModel = aiViewModel::check,
+        onRemoveModel = aiViewModel::remove,
+        onTurnModelOnAgain = aiViewModel::turnOnAgain,
         onBack = onBack,
+    )
+
+    LaunchedEffect(ai.outcome) {
+        // A refused import, or anything done since, leaves no copy to offer for deletion.
+        if (ai.outcome != null && ai.outcome !is ModelOutcome.Imported) pickedModel = null
+    }
+    val imported = ai.outcome as? ModelOutcome.Imported
+    val source = pickedModel
+    if (imported != null && source != null) {
+        DeleteDownloadedCopyDialog(
+            name = imported.info.name,
+            size = Formatter.formatShortFileSize(context, imported.info.sizeBytes),
+            onDelete = { PickedFile.delete(context.contentResolver, source).also { deleted -> if (deleted) pickedModel = null } },
+            onKeep = { pickedModel = null },
+        )
+    }
+}
+
+/** After an import: the copy in Downloads is no longer needed. Tells you if it couldn't be deleted. */
+@Composable
+private fun DeleteDownloadedCopyDialog(name: String, size: String, onDelete: () -> Boolean, onKeep: () -> Unit) {
+    var failed by remember { mutableStateOf(false) }
+    if (failed) {
+        AlertDialog(
+            onDismissRequest = onKeep,
+            text = { Text(stringResource(R.string.ai_delete_source_failed, name)) },
+            confirmButton = { TextButton(onClick = onKeep) { Text(stringResource(R.string.dialog_ok)) } },
+        )
+        return
+    }
+    AlertDialog(
+        onDismissRequest = onKeep,
+        title = { Text(stringResource(R.string.ai_delete_source_title)) },
+        text = { Text(stringResource(R.string.ai_delete_source_text, name, size)) },
+        confirmButton = { TextButton(onClick = { if (!onDelete()) failed = true }) { Text(stringResource(R.string.ai_delete_source_confirm)) } },
+        dismissButton = { TextButton(onClick = onKeep) { Text(stringResource(R.string.ai_delete_source_keep)) } },
     )
 }
 

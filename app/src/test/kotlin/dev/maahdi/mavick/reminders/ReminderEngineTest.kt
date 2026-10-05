@@ -216,6 +216,16 @@ class ReminderEngineTest {
     }
 
     @Test
+    fun `suggestions waiting bring the briefing on a day with nothing due, and it counts them`() = runTest {
+        val withSuggestions = ReminderEngine(tasks, notifier, scheduler, settings, clock = { clock }, chores = chores, countSuggestions = { 3 })
+        clock.setLocal(today.atTime(8, 0))
+
+        withSuggestions.onDailyAlarm()
+
+        assertThat(notifier.briefings.single().suggestionsWaiting).isEqualTo(3)
+    }
+
+    @Test
     fun `the briefing runs on weekends too`() = runTest {
         val saturday = today.plusDays(5)
         tasks.create(TaskDraft(title = "Weekend errand", dueDate = saturday))

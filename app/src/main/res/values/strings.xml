@@ -240,4 +240,84 @@
         <item quantity="one">%d overdue</item>
         <item quantity="other">%d overdue</item>
     </plurals>
+
+    <!-- Suggested tasks (Phase 3) -->
+    <string name="channel_suggestions">Suggested tasks</string>
+    <string name="channel_suggestions_description">Tasks Mavick found in your messages, waiting for you to add or ignore</string>
+    <string name="suggestions_public_title">Mavick suggestions</string>
+    <plurals name="suggestions_waiting">
+        <item quantity="one">%d suggested task to review</item>
+        <item quantity="other">%d suggested tasks to review</item>
+    </plurals>
+    <plurals name="suggestions_banner">
+        <item quantity="one">Mavick found %d possible task in your messages.</item>
+        <item quantity="other">Mavick found %d possible tasks in your messages.</item>
+    </plurals>
+    <string name="suggestions_review">Review</string>
+    <string name="suggestions_title">Suggested tasks</string>
+    <string name="suggestions_empty">Nothing to review. When a message asks you to do something, Mavick suggests it here for you to add or ignore.</string>
+    <string name="suggestions_off">Suggestions are off.</string>
+    <string name="suggestions_engine_rules">No AI model yet: suggestions come from simple rules (a date or time plus a to-do word). Import a model in Settings.</string>
+    <string name="suggestion_add">Add</string>
+    <string name="suggestion_add_pick_time">Add…</string>
+    <string name="suggestion_edit">Edit</string>
+    <string name="suggestion_ignore">Ignore</string>
+    <string name="suggestion_added">Added to your tasks</string>
+    <string name="suggestion_ignored">Ignored</string>
+    <string name="suggestion_kind_event">Event</string>
+    <string name="suggestion_kind_reminder">Reminder</string>
+    <string name="suggestion_when_unread">When: \"%1$s\" (pick a time)</string>
+    <string name="suggestion_when_note">When: %1$s</string>
+    <string name="suggestion_unsure">Not sure</string>
+    <string name="suggestion_by_rules">Simple rules</string>
+
+    <!-- Settings: suggestions and the AI model (Phase 3) -->
+    <string name="settings_suggestions">Suggestions</string>
+    <string name="settings_suggestions_switch">Suggest tasks from messages</string>
+    <string name="settings_suggestions_summary">Mavick looks for tasks in new messages, on this phone. Nothing is added until you say so.</string>
+    <string name="ai_model">AI model</string>
+    <string name="ai_model_none">None. Simple rules find tasks instead: a date or time plus a to-do word.</string>
+    <string name="ai_model_info">%1$s · %2$s</string>
+    <string name="ai_model_import_hint">On the PC, copy a .litertlm model to the phone with scripts/push-model.ps1, then import it here. Mavick keeps its own copy in its private storage.</string>
+    <string name="ai_model_import">Import model</string>
+    <string name="ai_model_check">Check</string>
+    <string name="ai_model_remove">Remove</string>
+    <string name="ai_model_turn_on">Turn on again</string>
+    <string name="ai_model_importing_percent">Copying the model… %1$d%%</string>
+    <string name="ai_model_importing">Copying the model… %1$s</string>
+    <string name="ai_model_checking">Checking the model with a test message…</string>
+    <string name="ai_model_average">Answers in about %1$s s per message</string>
+    <string name="ai_model_problem">Couldn\'t run (%1$s). Trying again after %2$s; simple rules until then.</string>
+    <string name="ai_model_switched_off">Switched off: Mavick stopped twice while it ran. Simple rules until you turn it on again.</string>
+    <string name="ai_model_imported">Imported.</string>
+    <string name="ai_model_removed">AI model removed. Simple rules find tasks now.</string>
+    <string name="ai_model_remove_title">Remove the AI model?</string>
+    <string name="ai_model_remove_text">This frees %1$s. Suggestions then come from simple rules.</string>
+    <string name="ai_check_worked">It works: a test message took %1$s s.</string>
+    <string name="ai_check_not_usable">The model couldn\'t start. See the line above.</string>
+    <string name="ai_check_bad_answer">The model answered, but not in a form Mavick can use. Try another model.</string>
+    <string name="ai_check_failed">The model failed while answering (%1$s).</string>
+    <string name="ai_import_not_a_model">That isn\'t a LiteRT-LM model (.litertlm).</string>
+    <string name="ai_import_too_small">That file is too small to be a language model.</string>
+    <string name="ai_import_no_space">Not enough free space on the phone.</string>
+    <string name="ai_import_incomplete">The file didn\'t arrive whole. Copy it to the phone again.</string>
+    <string name="ai_import_damaged">The copy didn\'t match the file. Try again.</string>
+    <string name="ai_import_read_failed">The file couldn\'t be read.</string>
+    <string name="ai_delete_source_title">Delete the downloaded copy?</string>
+    <string name="ai_delete_source_text">Mavick has its own copy now. Deleting %1$s frees %2$s.</string>
+    <string name="ai_delete_source_confirm">Delete</string>
+    <string name="ai_delete_source_keep">Keep</string>
+    <string name="ai_delete_source_failed">Couldn\'t delete it. Delete %1$s in the Files app.</string>
+    <plurals name="ai_checked">
+        <item quantity="one">%d message checked</item>
+        <item quantity="other">%d messages checked</item>
+    </plurals>
+    <plurals name="ai_suggested">
+        <item quantity="one">%d suggestion</item>
+        <item quantity="other">%d suggestions</item>
+    </plurals>
+    <string name="ai_last_run">last looked %1$s</string>
+    <string name="ai_paused_battery_low">waiting: battery below %1$d%%</string>
+    <string name="ai_paused_battery_saver">waiting: Battery Saver is on</string>
+    <string name="ai_paused_hot">waiting: the phone is warm</string>
 </resources>

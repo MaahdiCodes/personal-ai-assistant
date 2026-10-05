@@ -65,10 +65,16 @@ class MavickNotificationListener : NotificationListenerService() {
         super.onDestroy()
     }
 
-    /** Separately guarded, so a recorder problem (debug builds) never costs a message. */
+    /**
+     * Separately guarded, so a recorder problem (debug builds) never costs a message. A saved
+     * message wakes the AI, which looks for tasks in it on its own thread.
+     */
     private suspend fun handle(sbn: StatusBarNotification) {
         guarded { recorder.record(sbn) }
-        guarded { container.capture.onNotification(NotificationReader.read(sbn)) }
+        guarded {
+            val result = container.capture.onNotification(NotificationReader.read(sbn))
+            if (result.saved > 0) container.suggestionWorker.wake()
+        }
     }
 
     /** Never crashes over one notification, and logs only the error's type, never content. */

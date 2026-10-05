@@ -1,5 +1,9 @@
 package dev.maahdi.mavick.ui.settings
 
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -7,16 +11,22 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import dev.maahdi.mavick.ai.AiPause
+import dev.maahdi.mavick.ai.AiStatus
+import dev.maahdi.mavick.ai.ImportProblem
+import dev.maahdi.mavick.ai.ModelCheck
+import dev.maahdi.mavick.ai.ModelInfo
 import dev.maahdi.mavick.capture.ReadingState
 import dev.maahdi.mavick.data.settings.AppSettings
 import dev.maahdi.mavick.health.StorageStatus
+import dev.maahdi.mavick.testing.TEST_ZONE
 import java.time.Duration
 import java.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** The Messages and Health parts of Settings. */
+/** The Messages, Suggestions and Health parts of Settings. */
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
     @get:Rule
@@ -26,12 +36,14 @@ class SettingsScreenTest {
     private var settings = AppSettings()
     private val calls = mutableListOf<String>()
 
-    private fun show(health: HealthInfo) {
+    private fun show(health: HealthInfo, ai: AiSettingsState = AiSettingsState()) {
         compose.setContent {
             SettingsScreen(
                 settings = settings,
                 health = health,
+                ai = ai,
                 now = now,
+                zone = TEST_ZONE,
                 use24Hour = true,
                 onChange = { change -> settings = change(settings) },
                 onFixNotifications = { calls += "notifications" },
@@ -41,10 +53,16 @@ class SettingsScreenTest {
                 onOpenAutostart = { calls += "autostart" },
                 onOpenReading = { calls += "reading" },
                 onDeleteAllMessages = { calls += "delete" },
+                onImportModel = { calls += "import" },
+                onCheckModel = { calls += "check" },
+                onRemoveModel = { calls += "remove" },
+                onTurnModelOnAgain = { calls += "turn on" },
                 onBack = {},
             )
         }
     }
+
+    private val gemma = ModelInfo("gemma3-1b-it-int4.litertlm", 584_417_280, "ab".repeat(32), now)
 
     private val working = HealthInfo(
         storage = StorageStatus.Ready(0),
@@ -145,5 +163,105 @@ class SettingsScreenTest {
         compose.onNodeWithText("What Mavick reads").performScrollTo().performClick()
 
         assertThat(calls).containsExactly("reading")
+    }
+
+    @Test
+    fun `suggestions can be switched off`() {
+        show(working)
+
+        compose.onNodeWithText("Suggest tasks from messages", substring = true).performScrollTo().performClick()
+
+        assertThat(settings.suggestionsEnabled).isFalse()
+    }
+
+    @Test
+    fun `without a model, simple rules are named and a model can be imported`() {
+        show(working)
+
+        compose.onNodeWithText("None. Simple rules find tasks instead: a date or time plus a to-do word.").performScrollTo().assertExists()
+        compose.onNodeWithText("Check").assertDoesNotExist()
+        compose.onNodeWithText("Import model").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("import")
+    }
+
+    @Test
+    fun `an imported model shows its name and size, its speed, and can be checked`() {
+        show(working, AiSettingsState(model = gemma, usable = true, status = AiStatus(modelAnswers = 2, modelMillis = 12_200)))
+
+        compose.onNodeWithText("gemma3-1b-it-int4.litertlm · 584 MB").performScrollTo().assertExists()
+        compose.onNodeWithText("Answers in about 6.1 s per message").assertExists()
+        compose.onNodeWithText("Check").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("check")
+    }
+
+    @Test
+    fun `removing the model asks first`() {
+        show(working, AiSettingsState(model = gemma, usable = true))
+
+        compose.onNodeWithText("Remove").performScrollTo().performClick()
+        assertThat(calls).isEmpty()
+        compose.onNodeWithText("This frees 584 MB. Suggestions then come from simple rules.").assertExists()
+        compose.onNode(hasText("Remove") and hasAnyAncestor(isDialog())).performClick()
+
+        assertThat(calls).containsExactly("remove")
+    }
+
+    @Test
+    fun `a model switched off for stopping Mavick can be turned on again`() {
+        show(working, AiSettingsState(model = gemma, usable = false, status = AiStatus(interruptions = AiStatus.MAX_INTERRUPTIONS)))
+
+        compose.onNodeWithText("Switched off: Mavick stopped twice while it ran. Simple rules until you turn it on again.").performScrollTo().assertExists()
+        compose.onNodeWithText("Check").assertDoesNotExist()
+        compose.onNodeWithText("Turn on again").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("turn on")
+    }
+
+    @Test
+    fun `a model that failed says when it is tried again`() {
+        val failedAt = now.minus(Duration.ofMinutes(10))
+        show(working, AiSettingsState(model = gemma, usable = false, status = AiStatus(problemAt = failedAt, problem = "LiteRtLmJniException")))
+
+        // Dhaka time: failed at 09:50, tried again from 10:50.
+        compose.onNodeWithText("Couldn't run (LiteRtLmJniException). Trying again after Today · 10:50; simple rules until then.")
+            .performScrollTo()
+            .assertExists()
+    }
+
+    @Test
+    fun `importing shows how far the copy got, and other buttons wait`() {
+        show(working, AiSettingsState(model = gemma, importing = ImportProgress(copied = 146_104_320, total = 584_417_280)))
+
+        compose.onNodeWithText("Copying the model… 25%").performScrollTo().assertExists()
+        compose.onNodeWithText("Import model").assertIsNotEnabled()
+        compose.onNodeWithText("Check").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `what happened last is said under the model`() {
+        show(working, AiSettingsState(model = gemma, usable = true, outcome = ModelOutcome.Imported(gemma, ModelCheck.Worked(5_200, 1))))
+        compose.onNodeWithText("Imported. It works: a test message took 5.2 s.").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `a refused import says why`() {
+        show(working, AiSettingsState(outcome = ModelOutcome.Rejected(ImportProblem.NOT_A_MODEL)))
+        compose.onNodeWithText("That isn't a LiteRT-LM model (.litertlm).").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `what the AI did is counted, with any pause`() {
+        show(
+            working,
+            AiSettingsState(
+                status = AiStatus(checked = 120, suggested = 4, lastRunAt = now.minus(Duration.ofMinutes(5)), pause = AiPause.BATTERY_LOW),
+            ),
+        )
+
+        compose.onNodeWithText("120 messages checked · 4 suggestions · last looked 5 min ago · waiting: battery below 20%")
+            .performScrollTo()
+            .assertExists()
     }
 }

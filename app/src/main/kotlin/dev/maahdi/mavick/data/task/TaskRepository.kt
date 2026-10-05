@@ -12,9 +12,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Today's and overdue open tasks, for the morning briefing. */
-data class Briefing(val overdue: List<TaskEntity>, val today: List<TaskEntity>) {
-    val isEmpty: Boolean get() = overdue.isEmpty() && today.isEmpty()
+/** Today's and overdue open tasks, and suggested tasks waiting for you, for the morning briefing. */
+data class Briefing(val overdue: List<TaskEntity>, val today: List<TaskEntity>, val suggestionsWaiting: Int = 0) {
+    val isEmpty: Boolean get() = overdue.isEmpty() && today.isEmpty() && suggestionsWaiting == 0
 }
 
 /**

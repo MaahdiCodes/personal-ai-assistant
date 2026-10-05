@@ -71,4 +71,33 @@ interface MessageDao {
 
     @Query("SELECT DISTINCT app, accountKey FROM message ORDER BY app, accountKey")
     suspend fun accounts(): List<AccountRef>
+
+    /** The newest message waiting for the AI (Phase 3). */
+    @Query("SELECT * FROM message WHERE aiState = 'PENDING' ORDER BY postedAt DESC, receivedAt DESC LIMIT 1")
+    suspend fun nextPending(): MessageEntity?
+
+    @Query("SELECT COUNT(*) FROM message WHERE aiState = 'PENDING'")
+    suspend fun countPending(): Int
+
+    @Query("UPDATE message SET aiState = :state WHERE id = :id")
+    suspend fun setAiState(id: String, state: AiState): Int
+
+    /** Messages still waiting that were sent before [cutoff] are too old to suggest anything. */
+    @Query("UPDATE message SET aiState = 'SKIPPED' WHERE aiState = 'PENDING' AND postedAt < :cutoff")
+    suspend fun skipPendingBefore(cutoff: Instant): Int
+
+    /** Up to [limit] messages sent before [before] in one chat, newest first: context for the AI. */
+    @Query(
+        """
+        SELECT * FROM message
+        WHERE app = :app AND accountKey = :accountKey AND conversationKey = :conversationKey AND postedAt < :before
+        ORDER BY postedAt DESC, receivedAt DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun earlierInChat(app: SourceApp, accountKey: String, conversationKey: String, before: Instant, limit: Int): List<MessageEntity>
+
+    /** The newest messages, for the accuracy-check export. */
+    @Query("SELECT * FROM message ORDER BY postedAt DESC, receivedAt DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<MessageEntity>
 }

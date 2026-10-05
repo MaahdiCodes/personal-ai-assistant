@@ -13,15 +13,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/** A problem the user can usually fix: shown across the top of a screen, with an optional button. */
+/**
+ * Shown across the top of a screen, with an optional button: a problem the user can usually fix,
+ * or, with [problem] false, news such as suggested tasks waiting.
+ */
 @Composable
-fun Banner(message: String, action: String?, onAction: () -> Unit, detail: String? = null) {
-    Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+fun Banner(message: String, action: String?, onAction: () -> Unit, detail: String? = null, problem: Boolean = true) {
+    val background = if (problem) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
+    val content = if (problem) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+    Surface(color = background, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(message, color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(message, color = content)
                 if (detail != null) {
-                    Text(detail, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
+                    Text(detail, color = content, style = MaterialTheme.typography.bodySmall)
                 }
             }
             if (action != null) TextButton(onClick = onAction) { Text(action) }

@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -84,6 +85,7 @@ fun TasksScreen(
     onNewTask: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenInbox: () -> Unit,
+    onOpenSuggestions: () -> Unit,
     notificationsBlocked: Boolean,
     onFixNotifications: () -> Unit,
     snackbarHostState: SnackbarHostState,
@@ -112,6 +114,14 @@ fun TasksScreen(
         Column(Modifier.padding(innerPadding).fillMaxSize()) {
             if (notificationsBlocked) Banner(stringResource(R.string.notifications_blocked), stringResource(R.string.turn_on), onFixNotifications)
             state.storageError?.let { Banner(stringResource(R.string.storage_problem, it), action = null, onAction = {}) }
+            if (state.suggestionsWaiting > 0) {
+                Banner(
+                    message = pluralStringResource(R.plurals.suggestions_banner, state.suggestionsWaiting, state.suggestionsWaiting),
+                    action = stringResource(R.string.suggestions_review),
+                    onAction = onOpenSuggestions,
+                    problem = false,
+                )
+            }
             PrimaryTabRow(selectedTabIndex = tab.ordinal) {
                 TasksTab.entries.forEach { entry ->
                     Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(stringResource(entry.label)) })

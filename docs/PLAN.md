@@ -20,7 +20,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 | 0. Foundation | Project, encrypted storage, safety checks, scripts | 🧪 Code and tests done. Runs on the Pixel; full phone check pending. |
 | 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done. Runs on the Pixel; full phone check pending. |
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail / Keep notifications, rules about what to read, Inbox | 🧪 Code and tests done (464 PC tests in total). Not yet on a phone. WhatsApp's own account switcher is not told apart yet (§5.1). |
-| 3. AI suggestions | On-device AI turning messages into suggested tasks | ⬜ |
+| 3. AI suggestions | On-device AI turning messages into suggested tasks | 🔨 In progress (2026-10-05): suggestions from messages built and tested (AI runtime, queue, Suggestions screen, Settings › Suggestions); Keep Takeout import, accuracy-check tools and this plan's Phase 3 sections still to come. |
 | 4. Calendar + planning | Calendar sync, clashes, widget | ⬜ |
 | 5. Backups + hardening | Encrypted Google Drive backups, reliability | ⬜ |
 | 6. Combined task list | One list across both phones | ⬜ |

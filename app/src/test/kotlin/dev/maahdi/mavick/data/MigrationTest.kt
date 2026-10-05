@@ -9,7 +9,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
+import dev.maahdi.mavick.data.message.AiState
 import dev.maahdi.mavick.data.task.TaskPriority
+import dev.maahdi.mavick.data.task.TaskSource
 import dev.maahdi.mavick.data.task.TaskStatus
 import dev.maahdi.mavick.time.RepeatRule
 import java.time.Instant
@@ -103,6 +105,46 @@ class MigrationTest {
         assertThat(task.repeatRule).isEqualTo(RepeatRule.Monthly(1))
         assertThat(messageCount).isEqualTo(0)
         assertThat(rules).isEmpty()
+    }
+
+    @Test
+    fun `Phase 2 tasks and messages survive the upgrade to version 4, which adds an empty suggestion table`() {
+        helper.createDatabase(3).apply {
+            execSQL(
+                """
+                INSERT INTO task (id, title, notes, dueDate, dueTime, remindAt, priority, status, source,
+                                  sourceExcerpt, createdAt, updatedAt, deletedAt, reminderTime, repeatRule, completedAt)
+                VALUES ('t3', 'Call the bank', NULL, '2026-10-06', NULL, NULL, 'NORMAL',
+                        'OPEN', 'MESSAGE', 'Call the bank tomorrow', 1000, 2000, NULL, NULL, NULL, NULL)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO message (id, app, accountKey, conversationKey, conversationTitle, sender, text, postedAt,
+                                     receivedAt, isFromMe, isGroup, cutShort, dedupHash, aiState)
+                VALUES ('m1', 'WHATSAPP', '0', 's:family', 'Family', 'Sam', 'Bring the cake at 5', 3000,
+                        4000, 0, 1, 0, 'hash-1', 'PENDING')
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(4).close()
+
+        val database = Room.databaseBuilder(context, MavickDatabase::class.java, databaseFile.absolutePath)
+            .allowMainThreadQueries()
+            .build()
+        val task = runBlocking { database.taskDao().findById("t3") }!!
+        val message = runBlocking { database.messageDao().findById("m1") }!!
+        val suggestionCount = runBlocking { database.suggestionDao().count() }
+        database.close()
+
+        assertThat(task.title).isEqualTo("Call the bank")
+        assertThat(task.source).isEqualTo(TaskSource.MESSAGE)
+        assertThat(message.text).isEqualTo("Bring the cake at 5")
+        // Waiting for the AI, which arrives with version 4.
+        assertThat(message.aiState).isEqualTo(AiState.PENDING)
+        assertThat(suggestionCount).isEqualTo(0)
     }
 
     private companion object {

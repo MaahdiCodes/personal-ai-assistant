@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
         // If Android dropped message reading (HyperOS does), ask it to connect again. Does nothing
         // when reading is already connected or access isn't granted.
         if (container.hasNotificationAccess()) NotificationListenerService.requestRebind(container.listenerComponent)
+        // Messages left waiting for the AI (paused for the battery, say) get looked at now.
+        container.suggestionWorker.wake()
         // Restores alarms if Android force-stopped Mavick, once per process, off the main thread.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -89,6 +91,7 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_PROCESS_TEXT -> openTextAsTask(subject = null, text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString())
             ReminderIntents.ACTION_OPEN_TASK -> ReminderIntents.taskIdOf(intent)?.let { navigation.openEditor(taskId = it) }
             ReminderIntents.ACTION_OPEN_SETTINGS -> navigation.openSettings()
+            ReminderIntents.ACTION_OPEN_SUGGESTIONS -> navigation.openSuggestions()
         }
     }
 

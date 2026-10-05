@@ -13,6 +13,8 @@ import dev.maahdi.mavick.data.message.MessageEntity
 import dev.maahdi.mavick.data.rules.ExclusionRuleDao
 import dev.maahdi.mavick.data.rules.ExclusionRuleEntity
 import dev.maahdi.mavick.data.security.DatabaseKeyRepository
+import dev.maahdi.mavick.data.suggestion.SuggestionDao
+import dev.maahdi.mavick.data.suggestion.SuggestionEntity
 import dev.maahdi.mavick.data.task.TaskDao
 import dev.maahdi.mavick.data.task.TaskEntity
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -22,12 +24,13 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  * 1. Phase 0: tasks.
  * 2. Phase 1: reminder time, repeat rule, completion time.
  * 3. Phase 2: messages read from notifications, the rules about what to read, listener health.
+ * 4. Phase 3: suggestions found in messages (deleted together with their message).
  */
 @Database(
-    entities = [TaskEntity::class, MessageEntity::class, ExclusionRuleEntity::class, HealthEventEntity::class],
-    version = 3,
+    entities = [TaskEntity::class, MessageEntity::class, ExclusionRuleEntity::class, HealthEventEntity::class, SuggestionEntity::class],
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 @TypeConverters(Converters::class)
 abstract class MavickDatabase : RoomDatabase() {
@@ -38,6 +41,8 @@ abstract class MavickDatabase : RoomDatabase() {
     abstract fun exclusionRuleDao(): ExclusionRuleDao
 
     abstract fun healthEventDao(): HealthEventDao
+
+    abstract fun suggestionDao(): SuggestionDao
 
     companion object {
         const val FILE_NAME = "mavick.db"

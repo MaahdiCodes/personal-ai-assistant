@@ -3,6 +3,7 @@ package dev.maahdi.mavick.data.message
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.maahdi.mavick.capture.IncomingMessage
 import dev.maahdi.mavick.capture.SourceApp
 import java.time.Instant
 
@@ -47,7 +48,16 @@ data class MessageEntity(
     val aiState: AiState = AiState.PENDING,
 )
 
-/** How far the AI (Phase 3) got with a message. Stored by name: never rename a constant. */
+/** The saved message in the form the capture rules check, so the AI can check them again. */
+fun MessageEntity.asIncoming(): IncomingMessage =
+    IncomingMessage(app, accountKey, conversationKey, conversationTitle, sender, text, postedAt, isFromMe, isGroup, cutShort)
+
+/**
+ * How far the AI (Phase 3) got with a message. Stored by name: never rename a constant.
+ *
+ * FAILED also marks a message the AI model was reading when Mavick stopped: it is set before the
+ * model starts, so a message that brings the app down is never tried again.
+ */
 enum class AiState { PENDING, SKIPPED, DONE, FAILED }
 
 /** A chat with saved messages, for picking a chat rule. */

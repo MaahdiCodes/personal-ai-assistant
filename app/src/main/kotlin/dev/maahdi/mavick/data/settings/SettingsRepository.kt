@@ -34,6 +34,8 @@ data class AppSettings(
     val xiaomiAutostartOn: Boolean = false,
     /** The default "Never read" keywords were added once; deleting one keeps it deleted. */
     val defaultRulesAdded: Boolean = false,
+    /** Look for tasks in new messages and suggest them (Phase 3). */
+    val suggestionsEnabled: Boolean = true,
 ) {
     fun captureFor(app: SourceApp): AppCapture = appCapture[app] ?: AppCapture()
 
@@ -93,6 +95,7 @@ class SettingsRepository(private val preferences: SharedPreferences) {
                 ?: AppSettings.DEFAULT_WARNING_DAYS,
             xiaomiAutostartOn = preferences.getBoolean(KEY_XIAOMI_AUTOSTART, false),
             defaultRulesAdded = preferences.getBoolean(KEY_DEFAULT_RULES_ADDED, false),
+            suggestionsEnabled = preferences.getBoolean(KEY_SUGGESTIONS_ENABLED, defaults.suggestionsEnabled),
         )
     }
 
@@ -118,6 +121,7 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             putInt(KEY_WARNING_DAYS, settings.readingWarningDays)
             putBoolean(KEY_XIAOMI_AUTOSTART, settings.xiaomiAutostartOn)
             putBoolean(KEY_DEFAULT_RULES_ADDED, settings.defaultRulesAdded)
+            putBoolean(KEY_SUGGESTIONS_ENABLED, settings.suggestionsEnabled)
         }
     }
 
@@ -161,5 +165,6 @@ class SettingsRepository(private val preferences: SharedPreferences) {
         private const val KEY_WARNING_DAYS = "reading_warning_days"
         private const val KEY_XIAOMI_AUTOSTART = "xiaomi_autostart_on"
         private const val KEY_DEFAULT_RULES_ADDED = "default_rules_added"
+        private const val KEY_SUGGESTIONS_ENABLED = "suggestions_enabled"
     }
 }

@@ -136,6 +136,14 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.sqlcipher.android)
     implementation(libs.kotlinx.coroutines.android)
+    // Phase 3: reading the AI's JSON answers and Keep Takeout notes (JsonElement API, no compiler plugin).
+    implementation(libs.kotlinx.serialization.json)
+    // Phase 3: runs the imported AI model on the phone's CPU. Adds no permissions (checked below).
+    // kotlin-reflect serves only its tool calling (ReflectionTool, ToolKt), which Mavick doesn't use;
+    // its own R8 rules would otherwise keep about 1,100 classes in the app.
+    implementation(libs.litertlm.android) {
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+    }
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)
@@ -238,11 +246,15 @@ val checkReadOnlyNotifications = tasks.register("checkReadOnlyNotifications") {
 
 /**
  * Largest APK allowed per build type, in bytes. Raise a budget deliberately (and update
- * docs/PLAN.md §5.8), never just to make a build pass. Release size: Phase 0 3.3 MB, Phase 1 4.5 MB.
+ * docs/PLAN.md §5.8), never just to make a build pass. Release size: Phase 0 3.3 MB, Phase 1 4.5 MB,
+ * Phase 2 4.7 MB, Phase 3 25.4 MB.
+ *
+ * Phase 3 raised both budgets on purpose: the on-device AI runtime (LiteRT-LM) is 21.5 MB of native
+ * code. It is stored uncompressed, so Android runs it from the APK without unpacking a second copy.
  */
 val apkSizeBudgets = mapOf(
-    "release" to 8L * 1024 * 1024,
-    "debug" to 40L * 1024 * 1024,
+    "release" to 30L * 1024 * 1024,
+    "debug" to 64L * 1024 * 1024,
 )
 
 androidComponents {

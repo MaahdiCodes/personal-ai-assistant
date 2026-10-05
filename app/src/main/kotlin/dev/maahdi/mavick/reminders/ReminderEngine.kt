@@ -15,6 +15,8 @@ class ReminderEngine(
     private val settings: SettingsRepository,
     private val clock: () -> Clock,
     private val chores: DailyChores = DailyChores.NONE,
+    /** Suggested tasks waiting for you (Phase 3), mentioned in the briefing. */
+    private val countSuggestions: suspend () -> Int = { 0 },
 ) {
     private val resyncedThisProcess = AtomicBoolean(false)
 
@@ -58,13 +60,16 @@ class ReminderEngine(
         scheduler.scheduleDaily(if (todayAt.isAfter(notBefore)) todayAt else todayAt.plusDays(1))
     }
 
-    /** The daily alarm went off: sets tomorrow's first, then the briefing (if on and anything is due), then the chores. */
+    /**
+     * The daily alarm went off: sets tomorrow's first, then the briefing (if on, and anything is
+     * due or suggested), then the chores.
+     */
     suspend fun onDailyAlarm() {
         // First, so nothing below can stop tomorrow's alarm. The minute's margin keeps an alarm
         // that fires a moment early from setting itself again for today.
         scheduleDailyAlarm(notBefore = LocalDateTime.now(clock()).plusMinutes(1))
         if (settings.current.briefingEnabled) {
-            val briefing = tasks.briefing(LocalDate.now(clock()))
+            val briefing = tasks.briefing(LocalDate.now(clock())).copy(suggestionsWaiting = countSuggestions())
             if (!briefing.isEmpty) notifier.showBriefing(briefing)
         }
         chores.cleanUp()

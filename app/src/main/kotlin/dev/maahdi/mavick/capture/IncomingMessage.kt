@@ -1,5 +1,6 @@
 package dev.maahdi.mavick.capture
 
+import dev.maahdi.mavick.data.toHex
 import java.security.MessageDigest
 import java.time.Instant
 
@@ -34,8 +35,7 @@ data class IncomingMessage(
             text,
             postedAt.toEpochMilli().toString(),
         )
-        val digest = MessageDigest.getInstance("SHA-256").digest(parts.joinToString(SEPARATOR).toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { byte -> "%02x".format(byte) }
+        return MessageDigest.getInstance("SHA-256").digest(parts.joinToString(SEPARATOR).toByteArray(Charsets.UTF_8)).toHex()
     }
 
     private companion object {

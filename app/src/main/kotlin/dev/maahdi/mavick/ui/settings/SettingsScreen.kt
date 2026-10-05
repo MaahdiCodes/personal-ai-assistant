@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -54,6 +55,7 @@ import dev.maahdi.mavick.time.DueFormatter
 import dev.maahdi.mavick.ui.components.TimePickerDialog
 import java.time.DayOfWeek
 import java.time.Instant
+import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -98,7 +100,9 @@ private val WEEK = listOf(
 fun SettingsScreen(
     settings: AppSettings,
     health: HealthInfo,
+    ai: AiSettingsState,
     now: Instant,
+    zone: ZoneId,
     use24Hour: Boolean,
     onChange: ((AppSettings) -> AppSettings) -> Unit,
     onFixNotifications: () -> Unit,
@@ -108,6 +112,10 @@ fun SettingsScreen(
     onOpenAutostart: () -> Unit,
     onOpenReading: () -> Unit,
     onDeleteAllMessages: () -> Unit,
+    onImportModel: () -> Unit,
+    onCheckModel: () -> Unit,
+    onRemoveModel: () -> Unit,
+    onTurnModelOnAgain: () -> Unit,
     onBack: () -> Unit,
 ) {
     var pickingBriefingTime by remember { mutableStateOf(false) }
@@ -191,6 +199,20 @@ fun SettingsScreen(
             HorizontalDivider()
 
             MessagesSection(settings, onChange, onOpenReading, onDeleteAllMessages = { confirmDeleteMessages = true })
+            HorizontalDivider()
+
+            SuggestionsSection(
+                settings = settings,
+                ai = ai,
+                now = now,
+                zone = zone,
+                use24Hour = use24Hour,
+                onChange = onChange,
+                onImportModel = onImportModel,
+                onCheckModel = onCheckModel,
+                onRemoveModel = onRemoveModel,
+                onTurnModelOnAgain = onTurnModelOnAgain,
+            )
             HorizontalDivider()
 
             HealthSection(
@@ -372,14 +394,18 @@ private fun HealthSection(
     )
 }
 
+/** A setting that is on or off. The whole row toggles it, not just the switch. */
 @Composable
-private fun SwitchRow(title: String, summary: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+internal fun SwitchRow(title: String, summary: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

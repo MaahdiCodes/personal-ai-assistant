@@ -134,6 +134,58 @@ class MessageRepositoryTest {
     }
 
     @Test
+    fun `the newest message waiting for the AI comes first, and handled ones are left alone`() = runTest {
+        repository.save(message("old", minute = 0), start)
+        repository.save(message("new", minute = 5), start)
+
+        val first = repository.nextPending()!!
+        assertThat(first.text).isEqualTo("new")
+        repository.setAiState(first.id, AiState.DONE)
+
+        assertThat(repository.nextPending()!!.text).isEqualTo("old")
+        assertThat(repository.countPending()).isEqualTo(1)
+        assertThat(repository.find(first.id)!!.aiState).isEqualTo(AiState.DONE)
+    }
+
+    @Test
+    fun `waiting messages sent before a cutoff are skipped, others keep waiting`() = runTest {
+        repository.save(message("old", minute = 0), start)
+        repository.save(message("new", minute = 10), start)
+        repository.setAiState(all().single { it.text == "new" }.id, AiState.DONE)
+        repository.save(message("old but done", minute = 1), start)
+        repository.setAiState(all().single { it.text == "old but done" }.id, AiState.DONE)
+
+        assertThat(repository.skipPendingBefore(start.plusSeconds(300))).isEqualTo(1)
+
+        assertThat(all().associate { it.text to it.aiState }).isEqualTo(
+            mapOf("old" to AiState.SKIPPED, "new" to AiState.DONE, "old but done" to AiState.DONE),
+        )
+        assertThat(repository.nextPending()).isNull()
+    }
+
+    @Test
+    fun `context is the three messages before, oldest first, from that chat and account only`() = runTest {
+        listOf("a", "b", "c", "d", "e").forEachIndexed { minute, text -> repository.save(message(text, minute = minute.toLong()), start) }
+        repository.save(message("other chat", minute = 2, chat = "s:work"), start)
+        repository.save(message("other account", minute = 3, account = "999"), start)
+        repository.save(message("other app", minute = 3, app = SourceApp.MESSENGER), start)
+
+        val current = all().single { it.text == "e" }
+
+        assertThat(repository.earlierInChat(current).map { it.text }).containsExactly("b", "c", "d").inOrder()
+        assertThat(repository.earlierInChat(all().single { it.text == "a" })).isEmpty()
+    }
+
+    @Test
+    fun `the newest messages come first for the export`() = runTest {
+        repository.save(message("a", minute = 0), start)
+        repository.save(message("b", minute = 1), start)
+        repository.save(message("c", minute = 2), start)
+
+        assertThat(repository.recent(2).map { it.text }).containsExactly("c", "b").inOrder()
+    }
+
+    @Test
     fun `accounts are listed per app`() = runTest {
         repository.save(message("a"), start)
         repository.save(message("b", minute = 1, account = "999"), start)

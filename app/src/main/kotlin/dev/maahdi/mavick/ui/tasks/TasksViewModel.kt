@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.maahdi.mavick.AppContainer
 import dev.maahdi.mavick.data.settings.SettingsRepository
+import dev.maahdi.mavick.data.suggestion.SuggestionRepository
 import dev.maahdi.mavick.data.task.TaskDraft
 import dev.maahdi.mavick.data.task.TaskEntity
 import dev.maahdi.mavick.data.task.TaskRepository
@@ -39,13 +40,21 @@ data class TasksUiState(
     val noDate: List<TaskEntity> = emptyList(),
     val done: List<TaskEntity> = emptyList(),
     val workDays: Set<DayOfWeek> = DEFAULT_WORK_DAYS,
+    /** Tasks found in messages, waiting for you (Phase 3). */
+    val suggestionsWaiting: Int = 0,
     val loading: Boolean = true,
     /** Set when the encrypted database can't be opened; the screen explains instead of crashing. */
     val storageError: String? = null,
 ) {
     companion object {
         /** [open] arrives sorted by date and time; each section keeps that order. */
-        fun build(open: List<TaskEntity>, done: List<TaskEntity>, today: LocalDate, workDays: Set<DayOfWeek>) = TasksUiState(
+        fun build(
+            open: List<TaskEntity>,
+            done: List<TaskEntity>,
+            today: LocalDate,
+            workDays: Set<DayOfWeek>,
+            suggestionsWaiting: Int = 0,
+        ) = TasksUiState(
             today = today,
             overdue = open.filter { it.dueDate?.isBefore(today) == true },
             dueToday = open.filter { it.dueDate == today },
@@ -53,6 +62,7 @@ data class TasksUiState(
             noDate = open.filter { it.dueDate == null },
             done = done,
             workDays = workDays,
+            suggestionsWaiting = suggestionsWaiting,
             loading = false,
         )
     }
@@ -63,6 +73,7 @@ data class UndoEvent(val snapshot: TaskEntity)
 
 class TasksViewModel(
     private val openTasks: suspend () -> TaskRepository,
+    private val openSuggestions: suspend () -> SuggestionRepository,
     private val settings: SettingsRepository,
     private val parser: () -> WhenParser,
     private val clock: () -> Clock,
@@ -73,9 +84,16 @@ class TasksViewModel(
     /** Watches the database only while the screen is visible (WhileSubscribed), to save battery. */
     val state: StateFlow<TasksUiState> = flow {
         val repository = openTasks()
+        val suggestions = openSuggestions()
         emitAll(
-            combine(repository.observeOpen(), repository.observeDone(), today, settings.settings) { open, done, day, current ->
-                TasksUiState.build(open, done, day, current.workDays)
+            combine(
+                repository.observeOpen(),
+                repository.observeDone(),
+                today,
+                settings.settings,
+                suggestions.observeNewCount(),
+            ) { open, done, day, current, waiting ->
+                TasksUiState.build(open, done, day, current.workDays, suggestionsWaiting = if (current.suggestionsEnabled) waiting else 0)
             },
         )
     }
@@ -130,7 +148,7 @@ class TasksViewModel(
         private const val STOP_WATCHING_AFTER_MS = 5_000L
 
         fun factory(container: AppContainer) = viewModelFactory {
-            initializer { TasksViewModel(container::openTasks, container.settings, container::whenParser, container.clock) }
+            initializer { TasksViewModel(container::openTasks, container::openSuggestions, container.settings, container::whenParser, container.clock) }
         }
     }
 }
