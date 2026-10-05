@@ -5,6 +5,11 @@ entirely on your phone: no server, no cloud AI, and no internet permission.
 
 The full plan, decisions and roadmap are in [docs/PLAN.md](docs/PLAN.md).
 
+**Now working (Phase 1):** task lists, quick-add in plain English ("Pay rent every month on the
+1st 10am"), reminders with Done / Snooze / Tomorrow, a daily morning briefing, app lock, and
+"Send to Mavick" from Google Keep. To check it on a phone, follow
+[docs/PHONE_CHECKLIST.md](docs/PHONE_CHECKLIST.md).
+
 ## Scripts
 
 Run these from the project folder in PowerShell.

@@ -4,12 +4,22 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
+import androidx.room.Upsert
+import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(task: TaskEntity)
+
+    @Update
+    suspend fun update(task: TaskEntity)
+
+    @Upsert
+    suspend fun upsert(task: TaskEntity)
 
     @Query("SELECT * FROM task WHERE id = :id")
     suspend fun findById(id: String): TaskEntity?
@@ -24,6 +34,34 @@ interface TaskDao {
     )
     fun observeOpen(): Flow<List<TaskEntity>>
 
+    /** Finished tasks, most recently finished first. */
+    @Query(
+        """
+        SELECT * FROM task
+        WHERE status = 'DONE' AND deletedAt IS NULL
+        ORDER BY completedAt DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeDone(limit: Int): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM task WHERE status = 'OPEN' AND deletedAt IS NULL AND remindAt IS NOT NULL")
+    suspend fun getPendingReminders(): List<TaskEntity>
+
+    /** Open tasks due on or before [date], for the morning briefing. */
+    @Query(
+        """
+        SELECT * FROM task
+        WHERE status = 'OPEN' AND deletedAt IS NULL AND dueDate IS NOT NULL AND dueDate <= :date
+        ORDER BY dueDate, dueTime IS NULL, dueTime, createdAt
+        """,
+    )
+    suspend fun getOpenDueOnOrBefore(date: LocalDate): List<TaskEntity>
+
     @Query("SELECT COUNT(*) FROM task WHERE deletedAt IS NULL")
     suspend fun countActive(): Int
+
+    /** Permanently removes tasks that were deleted before [cutoff]. */
+    @Query("DELETE FROM task WHERE deletedAt IS NOT NULL AND deletedAt < :cutoff")
+    suspend fun purgeDeletedBefore(cutoff: Instant): Int
 }

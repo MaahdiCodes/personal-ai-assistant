@@ -26,8 +26,8 @@ android {
         applicationId = "dev.maahdi.mavick"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -88,6 +88,8 @@ android {
         // Test helpers used by both the JVM tests and the on-phone tests.
         getByName("test").kotlin.directories += "src/sharedTest/kotlin"
         getByName("androidTest").kotlin.directories += "src/sharedTest/kotlin"
+        // Database schema history, read by the migration tests (debug build only).
+        getByName("debug").assets.directories += "$projectDir/schemas"
     }
 
     packaging {
@@ -122,7 +124,10 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material.icons.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     // Already pulled in by other libraries; declared because AndroidManifest.xml trims its startup list.
     implementation(libs.androidx.startup.runtime)
 
@@ -138,9 +143,14 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.androidx.room.testing)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.truth)
     androidTestImplementation(libs.kotlinx.coroutines.test)
@@ -158,11 +168,19 @@ dependencies {
 val allowedPermissions = setOf(
     // Added by androidx.core; protects the app's own internal broadcasts.
     "<appId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+    // Phase 1: show reminders and the morning briefing.
+    "android.permission.POST_NOTIFICATIONS",
+    // Phase 1: reminders at the exact minute (granted automatically to reminder apps).
+    "android.permission.USE_EXACT_ALARM",
+    // Phase 1: put reminders back after the phone restarts.
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    // Phase 1: app lock with fingerprint or screen-lock PIN.
+    "android.permission.USE_BIOMETRIC",
 )
 
 /**
  * Largest APK allowed per build type, in bytes. Raise a budget deliberately (and update
- * docs/PLAN.md §5.8), never just to make a build pass. Phase 0 release: about 3.4 MB.
+ * docs/PLAN.md §5.8), never just to make a build pass. Release size: Phase 0 3.3 MB, Phase 1 4.5 MB.
  */
 val apkSizeBudgets = mapOf(
     "release" to 8L * 1024 * 1024,

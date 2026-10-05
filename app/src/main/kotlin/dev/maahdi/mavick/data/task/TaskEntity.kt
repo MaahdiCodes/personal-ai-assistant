@@ -3,6 +3,7 @@ package dev.maahdi.mavick.data.task
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.maahdi.mavick.time.RepeatRule
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -24,6 +25,10 @@ data class TaskEntity(
     val dueDate: LocalDate? = null,
     /** Null means "any time that day". */
     val dueTime: LocalTime? = null,
+    /**
+     * The reminder still waiting to go off for the current occurrence. Null once it has gone off,
+     * or if there is no reminder. Snoozing moves only this.
+     */
     val remindAt: LocalDateTime? = null,
     val priority: TaskPriority = TaskPriority.NORMAL,
     val status: TaskStatus = TaskStatus.OPEN,
@@ -34,6 +39,12 @@ data class TaskEntity(
     val updatedAt: Instant,
     /** Set instead of deleting the row, so a restore or sync knows the task was deleted on purpose. */
     val deletedAt: Instant? = null,
+    /** Added in database version 2: the reminder's clock time on the due date, kept for repeats. */
+    val reminderTime: LocalTime? = null,
+    /** Added in database version 2. */
+    val repeatRule: RepeatRule? = null,
+    /** Added in database version 2: when the task (or, for repeats, its last occurrence) was done. */
+    val completedAt: Instant? = null,
 )
 
 // These enums are stored by name: never rename a constant, or existing rows become unreadable.

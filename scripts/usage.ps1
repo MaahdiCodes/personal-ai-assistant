@@ -2,8 +2,9 @@
 .SYNOPSIS
     Shows what Mavick uses on a phone: storage, memory, CPU, and anything it runs in the background.
 .DESCRIPTION
-    Use it any time to check that Mavick stays light. In Phase 0 the background counts should all
-    be 0, and memory/CPU only apply while the app is open.
+    Use it any time to check that Mavick stays light. Background services and jobs should be 0;
+    scheduled alarms should equal your pending reminders plus one for the morning briefing.
+    Memory and CPU only apply while the app is open.
 .PARAMETER Phone
     "pixel", "poco" or a serial. Needed only when more than one phone is connected.
 .PARAMETER DebugBuild

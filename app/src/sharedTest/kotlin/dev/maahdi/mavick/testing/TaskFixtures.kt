@@ -2,8 +2,10 @@ package dev.maahdi.mavick.testing
 
 import dev.maahdi.mavick.data.task.TaskEntity
 import dev.maahdi.mavick.data.task.TaskStatus
+import dev.maahdi.mavick.time.RepeatRule
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.util.UUID
 
@@ -18,13 +20,19 @@ fun task(
     status: TaskStatus = TaskStatus.OPEN,
     createdAt: Instant = TEST_NOW,
     deletedAt: Instant? = null,
+    remindAt: LocalDateTime? = null,
+    reminderTime: LocalTime? = null,
+    repeatRule: RepeatRule? = null,
 ): TaskEntity = TaskEntity(
     id = id,
     title = title,
     dueDate = dueDate,
     dueTime = dueTime,
+    remindAt = remindAt,
     status = status,
     createdAt = createdAt,
     updatedAt = createdAt,
     deletedAt = deletedAt,
+    reminderTime = reminderTime,
+    repeatRule = repeatRule,
 )

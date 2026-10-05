@@ -1,20 +1,121 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mavick</string>
-    <string name="home_subtitle">Phase 0 · foundation</string>
 
+    <!-- Task lists -->
+    <string name="tab_today">Today</string>
+    <string name="tab_upcoming">Upcoming</string>
+    <string name="tab_done">Done</string>
+    <string name="section_overdue">Overdue</string>
+    <string name="section_today">Today</string>
+    <string name="section_no_date">No date</string>
+    <string name="empty_today">Nothing due today.</string>
+    <string name="empty_upcoming">Nothing planned yet.</string>
+    <string name="empty_done">Finished tasks appear here.</string>
+    <string name="quick_add_hint">Add a task, e.g. \"Call the bank tomorrow 5pm\"</string>
+    <string name="quick_add_button">Add</string>
+    <string name="new_task">New task</string>
+    <string name="open_settings">Settings</string>
+    <string name="mark_done">Mark \"%1$s\" done</string>
+    <string name="has_reminder">Has a reminder</string>
+    <string name="high_priority">High priority</string>
+    <string name="task_completed">Task done</string>
+    <string name="undo">Undo</string>
+    <string name="notifications_blocked">Notifications are blocked, so reminders can\'t appear.</string>
+    <string name="turn_on">Turn on</string>
+    <string name="storage_problem">Mavick can\'t open its encrypted storage: %1$s</string>
+
+    <!-- Task editor -->
+    <string name="editor_new_title">New task</string>
+    <string name="editor_edit_title">Edit task</string>
+    <string name="editor_save">Save</string>
+    <string name="back">Back</string>
+    <string name="editor_title_label">Title</string>
+    <string name="editor_title_required">A task needs a title.</string>
+    <string name="editor_notes_label">Notes</string>
+    <string name="editor_date">Date</string>
+    <string name="editor_time">Time</string>
+    <string name="editor_not_set">Not set</string>
+    <string name="editor_clear">Clear</string>
+    <string name="editor_reminder">Remind me</string>
+    <string name="editor_repeat">Repeat</string>
+    <string name="editor_priority">Priority</string>
+    <string name="editor_delete">Delete task</string>
+    <string name="editor_delete_confirm">Delete this task?</string>
+    <string name="editor_task_missing">This task no longer exists.</string>
+    <string name="editor_loading">Loading…</string>
+    <string name="repeat_none">Does not repeat</string>
+    <string name="repeat_daily">Every day</string>
+    <string name="repeat_work_days">Every work day</string>
+    <string name="repeat_weekly">Every week on %1$s</string>
+    <string name="repeat_monthly">Every month on the %1$s</string>
+    <string name="repeat_yearly">Every year on %1$s</string>
+    <string name="priority_low">Low</string>
+    <string name="priority_normal">Normal</string>
+    <string name="priority_high">High</string>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_cancel">Cancel</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_briefing">Morning briefing</string>
+    <string name="settings_briefing_summary">Every day: today\'s and overdue tasks, if there are any</string>
+    <string name="settings_briefing_time">Briefing time</string>
+    <string name="settings_app_lock">App lock</string>
+    <string name="settings_app_lock_summary">Fingerprint or phone PIN to open Mavick</string>
+    <string name="settings_app_lock_unavailable">Set a screen lock on this phone to use app lock.</string>
+    <string name="settings_work_days">Work days</string>
+    <string name="settings_work_days_summary">Used by \"every work day\" repeats. Everything else runs all week.</string>
+    <string name="settings_date_format">Dates like 12/10 mean</string>
+    <string name="settings_date_day_month">12 October (day/month)</string>
+    <string name="settings_date_month_day">December 10 (month/day)</string>
+    <string name="settings_health">Health</string>
     <string name="status_storage">Encrypted storage</string>
     <string name="status_storage_checking">Checking…</string>
     <string name="status_storage_ready">Ready</string>
-
     <string name="status_internet">Internet access</string>
     <string name="status_internet_none">None, by design</string>
     <string name="status_internet_present">Present. This should never happen.</string>
-
+    <string name="status_notifications">Notifications</string>
+    <string name="status_allowed">Allowed</string>
+    <string name="status_notifications_blocked">Blocked: reminders can\'t appear</string>
+    <string name="status_exact_alarms">On-time reminders</string>
+    <string name="status_exact_alarms_blocked">Not allowed: reminders may come late</string>
+    <string name="status_battery">Battery use</string>
+    <string name="status_battery_unrestricted">Unrestricted</string>
+    <string name="status_battery_restricted">Optimized: the phone may delay reminders</string>
     <string name="status_background">Background activity</string>
-    <string name="status_background_none">None</string>
-
+    <string name="status_background_alarms">Only alarms at reminder times</string>
+    <string name="status_fix">Fix</string>
     <string name="version_label">Version %1$s (%2$s build)</string>
     <string name="build_release">release</string>
     <string name="build_debug">debug</string>
+
+    <!-- App lock -->
+    <string name="lock_title">Mavick is locked</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_prompt_title">Unlock Mavick</string>
+
+    <!-- Notifications -->
+    <string name="channel_reminders">Reminders</string>
+    <string name="channel_reminders_description">Task reminders at their set time</string>
+    <string name="channel_briefing">Morning briefing</string>
+    <string name="channel_briefing_description">A daily summary of today\'s tasks</string>
+    <string name="reminder_public_title">Mavick reminder</string>
+    <string name="reminder_missed">Missed reminder</string>
+    <string name="reminder_missed_due">Missed reminder · %1$s</string>
+    <string name="action_done">Done</string>
+    <string name="action_snooze">Snooze 10 min</string>
+    <string name="action_tomorrow">Tomorrow</string>
+    <string name="briefing_title">Your day</string>
+    <string name="briefing_public_title">Mavick: your day</string>
+    <string name="briefing_overdue_line">Overdue: %1$s</string>
+    <plurals name="briefing_due_today">
+        <item quantity="one">%d task due today</item>
+        <item quantity="other">%d tasks due today</item>
+    </plurals>
+    <plurals name="briefing_overdue">
+        <item quantity="one">%d overdue</item>
+        <item quantity="other">%d overdue</item>
+    </plurals>
 </resources>

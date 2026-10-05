@@ -1,6 +1,7 @@
 package dev.maahdi.mavick.data
 
 import androidx.room.TypeConverter
+import dev.maahdi.mavick.time.RepeatRule
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -34,4 +35,10 @@ class Converters {
 
     @TypeConverter
     fun epochMillisToInstant(value: Long?): Instant? = value?.let(Instant::ofEpochMilli)
+
+    @TypeConverter
+    fun repeatRuleToText(value: RepeatRule?): String? = value?.toStorageString()
+
+    @TypeConverter
+    fun textToRepeatRule(value: String?): RepeatRule? = value?.let(RepeatRule::fromStorageString)
 }

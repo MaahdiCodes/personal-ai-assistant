@@ -1,8 +1,8 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phase 0 code is done and passes its PC tests (§7). Waiting on you: create the signing key, connect the phones, install, and run the on-phone tests.
+> **Status:** Phases 0 and 1 are coded and pass 274 PC tests (§7). Waiting on you: the phone check in [PHONE_CHECKLIST.md](PHONE_CHECKLIST.md), on both phones.
 > **Last updated:** 2026-10-05
-> **Next step:** finish Phase 0 on the phones, then start Phase 1.
+> **Next step:** phone check of Phases 0 + 1, then Phase 2 (message capture), which needs real notifications from your phones.
 
 ### Status at a glance
 
@@ -11,8 +11,8 @@
 | Phase | What it delivers | Status |
 |---|---|---|
 | Plan | Decisions, design, roadmap (this document) | ✅ |
-| 0. Foundation | Project, encrypted storage, safety checks, scripts | 🧪 Code + 43 PC tests done. Phone check pending (§7 "Phase 0 progress"). |
-| 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock | ⬜ |
+| 0. Foundation | Project, encrypted storage, safety checks, scripts | 🧪 Code and tests done. Phone check pending ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)). |
+| 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done (274 PC tests in total). Phone check pending, together with Phase 0. |
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail notifications, exclusions | ⬜ |
 | 3. AI suggestions | On-device AI turning messages into suggested tasks | ⬜ |
 | 4. Calendar + planning | Calendar sync, clashes, widget | ⬜ |
@@ -197,13 +197,15 @@ Further rules:
 ### 5.4 Reminders
 
 - **Scheduling:** `AlarmManager.setExactAndAllowWhileIdle` with `USE_EXACT_ALARM`. That permission is granted automatically on API 33+, and Play Store policy doesn't apply to an app you install yourself. If exact alarms are ever unavailable, the app falls back to inexact alarms and shows a warning on the Health screen.
-- **Rescheduling:** every alarm is rescheduled on `BOOT_COMPLETED`, `TIME_SET`, `TIMEZONE_CHANGED`, `MY_PACKAGE_REPLACED`, and at app start.
-- **After a reboot:** the encrypted database can't be read until the first unlock. Reminders due in that window fire right after unlocking, labelled **missed**.
-- **Notification actions:** Done · Snooze 10 min · Snooze 1 h · Tomorrow 09:00.
-- **Repeats:** daily / weekdays / weekly / monthly / every N days. "Monthly on the 31st" falls on the last day of shorter months.
+- **Rescheduling:** every alarm is set again on `BOOT_COMPLETED`, `TIME_SET`, `TIMEZONE_CHANGED`, `MY_PACKAGE_REPLACED`, and once each time the app's screen starts in a new process (Android wipes alarms when an app is force-stopped).
+- **After a reboot:** the encrypted database can't be read until the first unlock. Reminders due in that window appear right after unlocking, labelled **missed**.
+- **Which tasks remind:** a task with a time reminds at that time (or at a reminder time you set in the editor). A task with only a date has no separate reminder; it appears in the morning briefing. You can still add a reminder to it in the editor.
+- **Notification buttons (built in Phase 1):** Done · Snooze 10 min · Tomorrow. Android shows at most three, so "Snooze 1 h" was dropped. "Tomorrow" moves the task to tomorrow, reminding at its usual time (09:00 if it has none). The buttons need the phone unlocked before they act.
+- **Lock-screen privacy:** reminders show only "Mavick reminder" until the phone is unlocked.
+- **Repeats:** every day / every N days / every work day / weekly (one or more days, or every N weeks) / monthly / yearly. "Monthly on the 31st" falls on the last day of shorter months, and 29 February on 28 February outside leap years. Marking a repeating task done moves it to its next occurrence after today.
 - **Time zones:** a reminder keeps its local clock time (e.g. 09:00) when the phone changes time zone.
-- **Notification channels:** Reminders (high), Suggestions (default), Morning briefing (low), Health warnings (default).
-- **Morning briefing:** at a time you choose (default 08:00). Lists today's tasks, overdue tasks and pending suggestions.
+- **Notification channels:** Reminders (high importance) and Morning briefing (default). Suggestions (Phase 3) and Health warnings (Phase 2) are added later.
+- **Morning briefing:** every day, weekends included, at a time you choose (default 08:00). Lists overdue and today's tasks, and only appears if there are any. Pending AI suggestions join it in Phase 3.
 
 ### 5.5 Data model (first cut)
 
@@ -256,13 +258,13 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 
 | Resource | Budget | How it is enforced or checked |
 |---|---|---|
-| App size | Release APK **≤ 8 MB** (Phase 0: 3.3 MB) | The build fails above budget (`checkReleaseApkSize`). Raising a budget needs a deliberate change here. |
+| App size | Release APK **≤ 8 MB** (Phase 0: 3.3 MB, Phase 1: 4.5 MB) | The build fails above budget (`checkReleaseApkSize`). Raising a budget needs a deliberate change here. |
 | Code shipped | 64-bit ARM native code only, English resources only, unused code stripped (R8) | `abiFilters`, `localeFilters` and `isMinifyEnabled` in `app/build.gradle.kts` |
 | App data | Typically a few MB | Raw messages deleted after 14 days (§5.6). `usage.ps1` shows data + cache. |
 | AI model (Phase 3) | **Gemma 3 1B, about 0.5 GB**. E2B (about 3 GB) only with your OK. | Optional import. Mavick works without a model. |
 | Memory | The AI model is in memory only while it is processing | Unloaded 1 minute after the queue empties. `usage.ps1` shows memory (PSS). |
 | CPU at startup | One small database open, off the main thread, with no slow key stretching and no emoji-font loading | `DatabaseKeyRepository` (raw key) and the startup trimming in `AndroidManifest.xml` |
-| Background, Phases 0–1 | **Nothing runs** except reminder alarms at their exact times (Phase 1) | The release manifest declares 0 services. `usage.ps1` counts services, jobs and alarms. |
+| Background, Phases 0–1 | **Nothing runs** except reminder alarms at their exact times and one morning-briefing alarm a day (Phase 1) | The release manifest declares 0 services. `usage.ps1` counts services, jobs and alarms. |
 | Background, Phase 2+ | The notification listener wakes only when a notification arrives. No polling, no wake locks. One daily cleanup job, run while charging. | `usage.ps1` plus Android's battery stats |
 | CPU for AI, Phase 3 | ≤ 2 threads, one message at a time. Pauses on low battery, Battery Saver, or a warm phone. | §5.3 Runtime. Measured on both phones. |
 
@@ -330,6 +332,23 @@ Times assume part-time work, with Claude writing most of the code.
 | On-phone tests (real encryption hardware) | ⏳ `.\scripts\test.ps1 -OnPhone` |
 | Usage measured on both phones | ⏳ `.\scripts\usage.ps1`. Record the numbers here. |
 
+**Phase 1 progress (2026-10-05)**
+
+| Item | Status |
+|---|---|
+| Today / Upcoming / Done lists, editor, quick-add with preview | ✅ Done |
+| Quick-add language (dates, times, repeats, "in 2 hours", "every work day") | ✅ Done. 119 example phrases tested. |
+| Repeats: every day / N days / work days / weekly / monthly / yearly | ✅ Done, including month-end and 29 February |
+| Reminders: exact alarms, Done / Snooze / Tomorrow, missed after restart, reset on time-zone change | ✅ Done. Notifications are private on the lock screen. |
+| Morning briefing, every day | ✅ Done. Only appears when something is due. |
+| App lock (fingerprint / phone PIN, after 5 min away) | ✅ Done |
+| Share from Google Keep (or any app) into a new task | ✅ Done |
+| Database upgrade 1 → 2 | ✅ Done. Migration test shows Phase 0 tasks are kept. |
+| PC tests + Lint | ✅ 274 tests passing, Lint: no issues |
+| Release APK | ✅ 4.5 MB (budget 8 MB). Permissions: notifications, exact alarms, restart, fingerprint, nothing else. 0 services. |
+| On-phone end-to-end reminder test | ⏳ Written (`ReminderDeliveryTest`). Runs with `.\scripts\test.ps1 -OnPhone`. |
+| Phone check on both phones | ⏳ [PHONE_CHECKLIST.md](PHONE_CHECKLIST.md) |
+
 ---
 
 ## 8. Testing strategy
@@ -378,6 +397,9 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | Signing-key backup location? | **Google Drive** | §5.7 B. App-data backups also go to Drive (§5.7 A). |
 | Package ID? | `dev.maahdi.mavick` (debug: `dev.maahdi.mavick.debug`) | Used from Phase 0 |
 | Phone resource limits? | Storage and CPU must stay low, and the phone must never hang | §5.8 budgets, enforced by build checks. Smallest AI model first. Release build for daily use. |
+| Testing on the phones? | Check each phase on both phones before starting the next | Phase 0 + 1 check now ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)). Phase 2 is built from real notifications captured on your phones. |
+| Work days? | Usually Sunday to Thursday, but messages come every day | "Every work day" repeats use Sun–Thu (changeable in Settings). Everything else, including the morning briefing and message reading, runs all 7 days. |
+| What does 12/10 mean? | 12 October (day/month) | Quick-add reads numeric dates as day/month (changeable in Settings) |
 
 **Still open (not blocking)**
 

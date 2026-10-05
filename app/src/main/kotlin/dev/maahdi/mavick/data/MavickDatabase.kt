@@ -1,6 +1,7 @@
 package dev.maahdi.mavick.data
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -10,7 +11,17 @@ import dev.maahdi.mavick.data.task.TaskDao
 import dev.maahdi.mavick.data.task.TaskEntity
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
-@Database(entities = [TaskEntity::class], version = 1, exportSchema = true)
+/**
+ * Version history (schemas in app/schemas, migrations tested in MigrationTest):
+ * 1. Phase 0: tasks.
+ * 2. Phase 1: reminder time, repeat rule, completion time.
+ */
+@Database(
+    entities = [TaskEntity::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
+)
 @TypeConverters(Converters::class)
 abstract class MavickDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
