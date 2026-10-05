@@ -3,11 +3,9 @@ package dev.maahdi.mavick.ui.settings
 import android.Manifest
 import android.app.AlarmManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.PowerManager
-import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
@@ -24,6 +22,7 @@ import dev.maahdi.mavick.AppContainer
 import dev.maahdi.mavick.data.settings.AppSettings
 import dev.maahdi.mavick.health.StorageStatus
 import dev.maahdi.mavick.security.canAuthenticate
+import dev.maahdi.mavick.ui.PhoneSettings
 
 @Composable
 fun SettingsRoute(container: AppContainer, onBack: () -> Unit) {
@@ -47,13 +46,8 @@ fun SettingsRoute(container: AppContainer, onBack: () -> Unit) {
             container.settings.update(change)
             container.reminderEngine.scheduleBriefing()
         },
-        onFixNotifications = {
-            context.startActivity(
-                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-            )
-        },
-        // The list of apps' battery settings; picking "Unrestricted" needs no extra permission.
-        onFixBattery = { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
+        onFixNotifications = { PhoneSettings.open(context, PhoneSettings.notifications(context)) },
+        onFixBattery = { PhoneSettings.open(context, PhoneSettings.battery()) },
         onBack = onBack,
     )
 }

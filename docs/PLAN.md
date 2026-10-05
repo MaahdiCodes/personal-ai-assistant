@@ -1,7 +1,7 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phases 0 and 1 are coded and pass 274 PC tests. Nothing has run on a phone yet: waiting on the user's phone check ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)).
-> **Last updated:** 2026-10-05, at the end of the session that built Phases 0–1.
+> **Status:** Phases 0 and 1 are coded, pass 286 PC tests, and passed a phone-and-account safety audit before the first install (§0.1). Nothing has run on a phone yet: waiting on the user's phone check ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)).
+> **Last updated:** 2026-10-05, after the pre-install safety audit.
 > **Next step:** the user runs the phone check on both phones → record the results → tag `phase-1` → start Phase 2.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
@@ -18,7 +18,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 |---|---|---|
 | Plan | Decisions, design, roadmap (this document) | ✅ |
 | 0. Foundation | Project, encrypted storage, safety checks, scripts | 🧪 Code and tests done. Phone check pending. |
-| 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done (274 PC tests in total). Phone check pending, together with Phase 0. |
+| 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done (286 PC tests in total). Phone check pending, together with Phase 0. |
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail notifications, exclusions | ⬜ |
 | 3. AI suggestions | On-device AI turning messages into suggested tasks | ⬜ |
 | 4. Calendar + planning | Calendar sync, clashes, widget | ⬜ |
@@ -27,6 +27,12 @@ This document is the single source of truth for the project. **§0 is the hand-o
 
 - **Git:** remote `https://github.com/MaahdiCodes/personal-ai-assistant` (private). On 2026-10-05 the user asked to merge `develop` into `main` before the phone check, so **`main` and `develop` are identical** and both hold Phase 0–1 (not yet phone-verified). New work still goes on **`develop`**, then is merged into `main` and pushed; a tag `phase-N` marks each phase that passes its phone check.
 - **Nothing has run on a phone yet:** no phone has been connected to the PC, the release build has never been installed, and the on-phone tests (`app/src/androidTest`) compile but have never run.
+- **Safety audit (2026-10-05, before the first install):** every source file, script and the merged release manifest were reviewed.
+  - **Accounts:** Phases 0–1 can't affect any account. There is no internet permission, no account access, no message reading, and no access to other apps or their data.
+  - **Phone:** Phases 0–1 can't harm the phone. The release manifest has 4 permissions and 0 services. Nothing runs in the background except reminder alarms. No phone setting is changed. The scripts run only read-only `adb` commands plus install and start of Mavick's own package. Uninstalling removes everything.
+  - **Real risks are in the setup:** developer settings left on, and changing the clock instead of the time zone. The checklist now covers both (its §7).
+  - **Fixed:** the "Fix" and "Turn on" buttons could crash on a phone without the battery settings screen; they now fall back to Mavick's App info (`ui/PhoneSettings.kt`). Shared styled text was silently dropped; it is now read as `CharSequence`.
+  - **Checklist:** adds the Poco's *USB debugging (Security settings)* switch, which the on-phone test needs.
 - **Versions:** app `versionCode 2`, `versionName 0.2.0`; database version 2.
 
 ### 0.2 Waiting on the user
@@ -35,13 +41,14 @@ This document is the single source of truth for the project. **§0 is the hand-o
 2. **Phone check** of Phases 0 + 1 on **both** phones ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)), and share the filled-in results table.
 3. **Phase tag:** once the check passes, tag `phase-1` (no merge needed; already merged).
 4. **For Phase 2:** how the several WhatsApp accounts are set up on each phone (WhatsApp's own "Add account", or a cloned app such as Xiaomi "Dual apps"), and both phones at hand to send test messages to each other.
+5. **For Phase 2:** OK to add "Mavick" to Android's text-selection menu for long messages (§10, open question 4)? Recommended.
 
 ### 0.3 Next actions, in order
 
 1. **Phone-check results:** record them in §7 (Phase 0 and Phase 1 progress tables) and the `usage.ps1` numbers in §5.8. Fix anything that failed. Reminder reliability on the Poco (HyperOS) is the most likely problem (§6).
 2. **Tag the release:** tag `phase-1` on `main` and push the tag.
 3. **Phase 2** (§7), in this order:
-   1. A **debug-only notification recorder** comes first. Using test messages with fake content sent between the two phones, it saves the raw notification extras as JSON fixtures. This shows what WhatsApp (with several accounts), Messenger, Gmail and Keep reminders really post on HyperOS and on the Pixel, and especially where the **WhatsApp account** appears (§5.1).
+   1. A **debug-only notification recorder** comes first. Using test messages with fake content sent between the two phones, it saves the raw notification extras as JSON fixtures. This shows what WhatsApp (with several accounts), Messenger, Gmail and Keep reminders really post on HyperOS and on the Pixel, and especially where the **WhatsApp account** appears (§5.1). Include **long test messages** (about 300, 1,500 and 5,000 characters) to find where each app's text is cut (§5.1, Long messages).
    2. Per-app parsers, built and tested against those fixtures (`src/test`, Robolectric).
    3. The exclusion engine (pure Kotlin, exhaustive tests), then the listener service, then the encrypted `message` table (database version 3, with a migration test), then the Inbox and Exclusions screens, then the Health additions (notification access, listener last seen, HyperOS checklist).
    4. Retention cleanup runs when the daily briefing alarm fires, so no new background job is needed (see the WorkManager rule in §0.7).
@@ -52,7 +59,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 1. `git fetch`, `git switch develop`, `git pull`. The local folder `E:\Personal\personal-ai-assistant` is already on `develop`.
 2. Read §0, then the sections for the phase being worked on.
 3. Check that the baseline passes:
-   - **Windows:** `.\scripts\test.ps1` (274 tests, Lint, permission checks).
+   - **Windows:** `.\scripts\test.ps1` (286 tests, Lint, permission checks).
    - **Linux or macOS:** `./gradlew :app:testDebugUnitTest :app:lintDebug :app:checkDebugPermissions :app:checkReleasePermissions`. This needs JDK 17+ and an Android SDK with platform 36 and build-tools 36.1. The PowerShell scripts are Windows-only.
 4. Ask the user for anything in §0.2 that is still missing before starting work that depends on it.
 
@@ -76,7 +83,7 @@ app/src/main/kotlin/dev/maahdi/mavick/
   security/                       AppLock, DeviceAuthentication (fingerprint or phone PIN)
   share/                          SharedText (Keep or share sheet to task draft)
   health/                         StorageHealthCheck
-  ui/                             MavickRoot, Navigation, tasks/, editor/, settings/, lock/, components/, theme/
+  ui/                             MavickRoot, Navigation, PhoneSettings (Fix buttons), tasks/, editor/, settings/, lock/, components/, theme/
 app/src/test/                   PC tests (JVM and Robolectric); testing/TestDoubles.kt has MutableClock and fakes
 app/src/androidTest/            On-phone tests: encryption, Keystore, real alarm to notification
 app/src/sharedTest/             Helpers for both test sets: task() fixture, containsSequence
@@ -202,7 +209,7 @@ CLAUDE.md                       Short pointer to this section for AI coding sess
 
 | Source | How | What we get | Limits |
 |---|---|---|---|
-| **WhatsApp** (`com.whatsapp`) | Notification listener, `MessagingStyle` (Phase 2) | Sender, chat/group name, text, time, and **which WhatsApp account** received it (several accounts per phone; see §5.1). May include replies you send from the notification itself. | No messages you send in the app, no muted chats, no history before install, nothing from the chat that's open on screen |
+| **WhatsApp** (`com.whatsapp`) | Notification listener, `MessagingStyle` (Phase 2) | Sender, chat/group name, text, time, and **which WhatsApp account** received it (several accounts per phone; see §5.1). May include replies you send from the notification itself. | No messages you send in the app, no muted chats, no history before install, nothing from the chat that's open on screen. Very long messages may be cut short: Android keeps at most 1,024 characters per message (§5.1, Long messages). |
 | **Messenger** (`com.facebook.orca`) | Notification listener, `MessagingStyle` (Phase 2) | Same as WhatsApp | Same as WhatsApp |
 | **Gmail** (`com.google.android.gm`) | Notification listener, `BigText` / `Inbox` styles (Phase 2) | Sender, subject, preview snippet, which account | Only emails Gmail notifies you about (usually Primary). Only the preview, not the full body. |
 | **Google Keep** (`com.google.android.keep`) | **No API for personal accounts** (the Keep API is for Google Workspace only). Three routes instead:<br>**(A)** Keep → ⋮ → *Send* → *Mavick* (share sheet): ✅ built in Phase 1 (`share/SharedText.kt`)<br>**(B)** one-time import of a **Google Takeout** export, in Phase 3<br>**(C)** Keep's own reminder notifications are captured when they fire, in Phase 2 | Note title + text or checklist | The Takeout export may not include reminder times. The parser will be built against **your real export**. |
@@ -255,7 +262,7 @@ Tasks ◄──── manual quick-add / share from Keep ──┘      (Phase 1
 | `security` | `AppLock` (when to lock), `DeviceAuthentication` (fingerprint or phone PIN available?) |
 | `share` | `SharedText`: text shared from Keep or any app becomes a task draft |
 | `health` | `StorageHealthCheck` (more checks arrive in Phase 2) |
-| `ui` | Compose: `MavickRoot`, `Navigation`, `tasks/` (Today, Upcoming, Done, quick-add), `editor/`, `settings/` (with Health), `lock/`, `components/`, `theme/` |
+| `ui` | Compose: `MavickRoot`, `Navigation`, `PhoneSettings` (opens the phone's settings screens, with an App info fallback), `tasks/` (Today, Upcoming, Done, quick-add), `editor/`, `settings/` (with Health), `lock/`, `components/`, `theme/` |
 
 **Planned**
 
@@ -290,6 +297,25 @@ Further rules:
 - **Listener health:** record connect/disconnect times and call `requestRebind` after a disconnect. Warn if nothing has arrived for N hours. The warning is configurable and silent at night.
 - **Logging:** message text is **never logged**.
 - **Permission:** the listener service is protected by `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE` (declared on the service, not requested). The user grants "Notification access" in Android settings; on an app installed over USB, Android may first need App info → ⋮ → *Allow restricted settings*.
+- **Read-only, so accounts are never affected:** the listener only reads.
+  - It never taps a notification's buttons (Reply, Mark as read, Mute) and never opens its tap action.
+  - It never dismisses or snoozes a notification.
+  - It never uses Accessibility and never reads other apps' files.
+
+  WhatsApp, Messenger and Gmail therefore can't tell Mavick exists. No read receipts ("blue ticks", "Seen") are sent, you never appear online, and no notification disappears. Smartwatches and car systems read notifications through the same Android feature.
+
+  Phase 2 adds a build check that fails if the code calls `cancelNotification`, `cancelAllNotifications` or `snoozeNotification`, fires another app's `PendingIntent`, uses `RemoteInput`, or declares an accessibility service.
+- **Long messages:** the notification shade shows only a line or two, but Mavick reads the notification's data, which holds much more. Two limits remain:
+  - Android caps each chat message in a notification at **1,024 characters**. This is `MAX_CHARSEQUENCE_LENGTH` in `Notification.java`: lowered from 5,120 in 2020, and still 1,024 in Android 15 and in the current source.
+  - Gmail sends only a preview of each email.
+
+  Phase 2 handles this in three steps:
+  1. **Measure:** the recorder (§0.3) captures long test messages on every app and WhatsApp account. Some apps keep a longer copy of the text in the notification's data, so the real cut-off point is measured, not assumed.
+  2. **Mark:** a message whose text reaches that cut-off is stored as *cut short*. The Inbox shows the full captured text with "Cut short: open WhatsApp for the rest". Phase 3's AI is told the text is partial.
+  3. **Manual routes for a whole long text:**
+     - Copy it in WhatsApp or Messenger and paste it into a task's notes (up to 5,000 characters).
+     - Select it in Gmail or a browser, then Share → Mavick (Phase 1, works now).
+     - Recommended addition, awaiting the user's OK (§10, open question 4): "Mavick" in Android's text-selection menu (`ACTION_PROCESS_TEXT`, no permission needed), so that selecting text and choosing Mavick works in any app.
 
 ### 5.2 Exclusions ("don't read these") (Phase 2)
 
@@ -420,6 +446,10 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 - [x] Mavick's broadcast receivers are not exported: other apps can't trigger them (Phase 1).
 - [ ] Raw messages auto-deleted after **14 days** (configurable 1–90). Tasks are kept (Phase 2).
 
+**Accounts**
+- [x] Phases 0–1 never touch an account: no internet, no account access, no message reading, no access to other apps or their data (audited 2026-10-05, §0.1).
+- [ ] Phase 2's listener is read-only, enforced by a build check (§5.1): no read receipts, no "online", no dismissed notifications.
+
 **Code and keys**
 - [x] Real messages are never committed to git. Private eval data lives in a git-ignored folder (`/eval/private/` in `.gitignore`). Test fixtures use **fake messages sent between your two phones**.
 - [ ] Release builds signed with your own key: the script is ready (`new-signing-key.ps1`). Waiting on the user to create the key and back up the keystore and its password (§5.7). Losing them means the app can't be updated without uninstalling it, which wipes its data.
@@ -470,9 +500,11 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
    - Allow **Notifications** (Mavick asks once on first start).
    - Set **Battery** to *Unrestricted* (Settings → Health → Fix).
    - From Phase 2: grant **Notification access**. If Android blocks it with "Restricted setting", go to App info → ⋮ → *Allow restricted settings*.
+4. When you're finished with the PC, turn **USB debugging** off, or Developer options off entirely (checklist §7). Mavick keeps working without it. Some banking and payment apps refuse to open while Developer options is on.
 
 **Poco X7 Pro (HyperOS) — extra steps, because Xiaomi closes background apps aggressively**
-- Developer options → **Install via USB** ON and **USB debugging (Security settings)** ON. These may require signing in to a Xiaomi account.
+- Developer options → **Install via USB** ON. Every install needs it, and turning it on may require signing in to a Xiaomi account.
+- Developer options → **USB debugging (Security settings)** ON **only while running the on-phone tests**. `GrantPermissionRule` needs it, because it lets the connected PC grant permissions and simulate taps. Turn it off afterwards.
 - App info → **Autostart** ON.
 - App info → Battery saver → **No restrictions**.
 - Recents → long-press the app card → **Lock**.
@@ -534,8 +566,9 @@ Times assume part-time work, with Claude writing most of the code.
 | App lock (fingerprint / phone PIN, after 5 min away) | ✅ Done |
 | Share from Google Keep (or any app) into a new task | ✅ Done |
 | Database upgrade 1 → 2 | ✅ Done. Migration test shows Phase 0 tasks are kept. |
-| PC tests + Lint | ✅ 274 tests passing, Lint: no issues |
+| PC tests + Lint | ✅ 286 tests passing, Lint: no issues |
 | Release APK | ✅ 4.5 MB (budget 8 MB). Permissions: notifications, exact alarms, restart, fingerprint, nothing else. 0 services. |
+| Pre-install safety audit (accounts, phone, scripts, merged manifest) | ✅ 2026-10-05 (§0.1). Fixed: Fix buttons fall back to App info instead of crashing; styled shared text accepted. Checklist: Poco test switch, time-zone wording, turning developer settings off. |
 | On-phone end-to-end reminder test | ⏳ Written (`ReminderDeliveryTest`). Runs with `.\scripts\test.ps1 -OnPhone`. |
 | Phone check on both phones | ⏳ [PHONE_CHECKLIST.md](PHONE_CHECKLIST.md) |
 
@@ -543,7 +576,7 @@ Times assume part-time work, with Claude writing most of the code.
 
 ## 8. Testing strategy
 
-**As built (Phases 0–1): 274 PC tests and 3 on-phone test classes.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler and notifier (same file), and the `task()` fixture (`sharedTest`).
+**As built (Phases 0–1): 286 PC tests and 3 on-phone test classes.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler and notifier (same file), and the `task()` fixture (`sharedTest`).
 
 | Test class | Runs on | Covers |
 |---|---|---|
@@ -556,6 +589,7 @@ Times assume part-time work, with Claude writing most of the code.
 | `AlarmReminderSchedulerTest`, `SystemNotifierTest` | PC (Robolectric) | Real AlarmManager / NotificationManager calls: times, time zones (including a daylight-saving gap), replacing, privacy on the lock screen, buttons |
 | `TaskDaoTest`, `MigrationTest`, `SettingsRepositoryTest` | PC (Robolectric) | Queries and ordering, database upgrade 1 → 2, settings persistence and damaged values |
 | `ScreensTest`, `AppSafetyTest` | PC (Robolectric + Compose) | Quick-add preview and add, task row, tabs, lock screen; no `INTERNET`, no backup, `FLAG_SECURE` |
+| `PhoneSettingsTest`, `ShareIntoMavickTest` | PC (Robolectric) | Fix buttons fall back to App info when a phone lacks or hides a settings screen; sharing plain or styled text opens the editor through the real activity |
 | `EncryptedDatabaseTest`, `AndroidKeystoreKeyWrapperTest` | Phone | The database file is really encrypted; Keystore wrapping; wrong or lost keys |
 | `ReminderDeliveryTest` | Phone | A real exact alarm wakes Mavick and shows the notification |
 
@@ -584,6 +618,8 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | HyperOS kills the listener or delays alarms on the Poco | High | Setup checklist, Health screen, rebind on disconnect, "no messages for N h" warning |
 | WhatsApp / Messenger / Gmail change their notification layout | Medium | Fixture tests per app. Generic fallback parser. |
 | Can't tell which WhatsApp account a notification belongs to (multi-account), or HyperOS hides a cloned app's notifications | Medium | Verify early in Phase 2 with the notification recorder. Worst case: messages are tagged "unknown account" and per-account rules fall back to chat rules. |
+| Long messages arrive cut short (Android keeps 1,024 characters per message; Gmail sends a preview) | Certain for very long messages | Measured with long test messages in Phase 2 step 1; cut-short marker; copy/paste and Share routes (§5.1) |
+| Developer options left on after setup: some banking apps refuse to open, and a trusted PC keeps USB access | Medium | Checklist §7 turns them off; Android also forgets a PC after 7 days unused |
 | The Drive app won't accept background overwrites (weekly backups, Phase 6 sync) | Medium | Weekly one-tap "Back up now" reminder. For Phase 6, use one of the sync alternatives. |
 | AI suggests wrong tasks or misses some | Medium | You confirm every suggestion first. Eval set. Auto-add only after the numbers are good. |
 | AI model too big, slow or hot | Medium | Smallest model first (Gemma 3 1B, about 0.5 GB). Throttling (§5.3). `usage.ps1` measurements. E2B only with your OK. |
@@ -624,12 +660,15 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | Deleting a task asks for confirmation (no undo) | Undo exists for "done"; delete is rarer and confirmed instead |
 | Platform `BiometricPrompt` instead of the AndroidX biometric library | No extra library or fragment dependency (minSdk 33 has everything needed) |
 | Text-only English formatting in code (`DueFormatter`) | Testable on the PC; the app is English-only |
+| "Fix" and "Turn on" buttons fall back to Mavick's App info page (`PhoneSettings`) | Android warns that some phones lack some settings screens; Mavick must never crash during setup |
+| Phase 2's listener is read-only: it never replies, marks read, opens, dismisses or snoozes (§5.1) | Keeps WhatsApp, Messenger and Gmail accounts unaffected: no read receipts, no "online", no lost notifications |
 
 **Still open**
 
 1. **How are the multiple WhatsApp accounts set up on each phone?** WhatsApp's own account switcher, or a clone such as Xiaomi "Dual apps"? Phase 2's notification recorder will verify this either way.
 2. **Tag `phase-1`:** after the phone check passes.
 3. **Background queue for the AI (Phase 3):** WorkManager (needs `WAKE_LOCK` and `FOREGROUND_SERVICE` on the allow-list) or an alarm-driven loop. Decide in Phase 3 after measuring.
+4. **"Mavick" in the text-selection menu (Phase 2)?** Select text in any app (Gmail, a browser, notes), then choose Mavick to make a task from it. This helps with long messages and emails that notifications cut short (§5.1). Recommended: yes. It needs no permission and is a small change.
 
 ---
 
@@ -651,6 +690,8 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 ## 12. Sources
 
 - Android sensitive-notification (OTP) restrictions: https://www.androidauthority.com/android-15-sensitive-notifications-3416414
+- Notification text cap lowered to 1,024 characters and applied to each chat message (2020): https://android.googlesource.com/platform/frameworks/base/+/aaf6b40%5E%21/
+- Android 15 restricted settings (notification access) for sideloaded apps: https://androidauthority.com/android-15-restricted-settings-sideloading-3481098
 - Keep API is Google Workspace-only: https://developers.google.com/keep/api/guides · https://workspaceupdates.googleblog.com/2021/05/keep-audit-logs-and-api.html
 - LiteRT-LM: https://github.com/google-ai-edge/LiteRT-LM · https://ai.google.dev/edge/litert-lm/overview
 - Gemini API free-tier data use: https://simonwillison.net/2024/Oct/17/gemini-terms-of-service

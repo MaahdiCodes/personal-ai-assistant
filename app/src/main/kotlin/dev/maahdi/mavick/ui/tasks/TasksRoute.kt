@@ -1,7 +1,5 @@
 package dev.maahdi.mavick.ui.tasks
 
-import android.content.Intent
-import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -20,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.maahdi.mavick.AppContainer
 import dev.maahdi.mavick.R
+import dev.maahdi.mavick.ui.PhoneSettings
 
 @Composable
 fun TasksRoute(
@@ -58,11 +57,7 @@ fun TasksRoute(
         onNewTask = onNewTask,
         onOpenSettings = onOpenSettings,
         notificationsBlocked = notificationsBlocked,
-        onFixNotifications = {
-            context.startActivity(
-                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-            )
-        },
+        onFixNotifications = { PhoneSettings.open(context, PhoneSettings.notifications(context)) },
         snackbarHostState = snackbarHostState,
     )
 }

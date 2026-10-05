@@ -83,9 +83,10 @@ class MainActivity : ComponentActivity() {
     /** Text shared from another app (for example Google Keep: ⋮ > Send > Mavick) opens as a new task. */
     private fun openSharedText(intent: Intent) {
         if (intent.type?.startsWith("text/") != true) return
+        // Read as CharSequence: some apps share styled text, which getStringExtra would drop.
         val draft = SharedText.toDraft(
-            subject = intent.getStringExtra(Intent.EXTRA_SUBJECT),
-            text = intent.getStringExtra(Intent.EXTRA_TEXT),
+            subject = intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString(),
+            text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString(),
             fromPackage = referrer?.host,
             parser = container.whenParser(),
             now = LocalDateTime.now(container.clock()),

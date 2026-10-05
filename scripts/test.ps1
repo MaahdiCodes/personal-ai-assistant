@@ -32,6 +32,10 @@ try {
 
 foreach ($target in $targets) {
     Write-Step "Running the on-phone tests on $($target.DisplayName)"
+    if ($target.IsXiaomi) {
+        Write-Host "Xiaomi/Poco: Developer options > 'USB debugging (Security settings)' must be ON for this test. Turn it off afterwards." -ForegroundColor Yellow
+        Write-Host "Watch the phone's screen and tap 'Install' twice: Mavick Debug, then its test app." -ForegroundColor Yellow
+    }
     $env:ANDROID_SERIAL = $target.Serial
     try {
         Invoke-Gradle -Tasks @(':app:connectedDebugAndroidTest')
