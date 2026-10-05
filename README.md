@@ -3,7 +3,9 @@
 A small, private Android assistant that turns your messages and notes into tasks and reminders,
 entirely on your phone: no server, no cloud AI, and no internet permission.
 
-The full plan, decisions and roadmap are in [docs/PLAN.md](docs/PLAN.md).
+The full plan, decisions and roadmap are in [docs/PLAN.md](docs/PLAN.md). **Picking the work
+up in a new session? Start with §0 of the plan:** it has the current state, what's next, and how
+to build and test.
 
 **Now working (Phase 1):** task lists, quick-add in plain English ("Pay rent every month on the
 1st 10am"), reminders with Done / Snooze / Tomorrow, a daily morning briefing, app lock, and
