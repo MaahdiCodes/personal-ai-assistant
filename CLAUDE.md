@@ -14,7 +14,8 @@ phones.
 The rest of the plan holds the design, decisions and roadmap.
 
 The rules that matter most:
-- **Branch:** work on `develop`. `main` only receives work that has been checked on both phones.
+- **Branch:** work on `develop`, then merge into `main` and push both. A `phase-N` tag marks a
+  phase that passed its phone check.
 - **Before ending any piece of work:**
   1. `.\scripts\test.ps1` must pass: tests, Lint and permission checks.
   2. Update docs/PLAN.md: §0 and the status tables in §7.

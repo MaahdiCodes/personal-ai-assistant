@@ -2,7 +2,7 @@
 
 > **Status:** Phases 0 and 1 are coded and pass 274 PC tests. Nothing has run on a phone yet: waiting on the user's phone check ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)).
 > **Last updated:** 2026-10-05, at the end of the session that built Phases 0–1.
-> **Next step:** the user runs the phone check on both phones → record the results → merge `develop` into `main` → start Phase 2.
+> **Next step:** the user runs the phone check on both phones → record the results → tag `phase-1` → start Phase 2.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
 
@@ -25,7 +25,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 | 5. Backups + hardening | Encrypted Google Drive backups, reliability | ⬜ |
 | 6. Combined task list | One list across both phones | ⬜ |
 
-- **Git:** remote `https://github.com/MaahdiCodes/personal-ai-assistant` (private). All Phase 0–1 work is on **`develop`**, pushed. **`main` still holds only the first two plan commits.** `develop` is merged into `main` once the phone check passes, so `main` always means "verified on the phones". **Work on `develop`.**
+- **Git:** remote `https://github.com/MaahdiCodes/personal-ai-assistant` (private). On 2026-10-05 the user asked to merge `develop` into `main` before the phone check, so **`main` and `develop` are identical** and both hold Phase 0–1 (not yet phone-verified). New work still goes on **`develop`**, then is merged into `main` and pushed; a tag `phase-N` marks each phase that passes its phone check.
 - **Nothing has run on a phone yet:** no phone has been connected to the PC, the release build has never been installed, and the on-phone tests (`app/src/androidTest`) compile but have never run.
 - **Versions:** app `versionCode 2`, `versionName 0.2.0`; database version 2.
 
@@ -33,13 +33,13 @@ This document is the single source of truth for the project. **§0 is the hand-o
 
 1. **Signing key:** run `.\scripts\new-signing-key.ps1` and back it up (§5.7 B). The user runs this; an AI session must never create it, because the password would end up in the transcript.
 2. **Phone check** of Phases 0 + 1 on **both** phones ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)), and share the filled-in results table.
-3. **Merge approval:** once the check passes, the OK to merge `develop` into `main`.
+3. **Phase tag:** once the check passes, tag `phase-1` (no merge needed; already merged).
 4. **For Phase 2:** how the several WhatsApp accounts are set up on each phone (WhatsApp's own "Add account", or a cloned app such as Xiaomi "Dual apps"), and both phones at hand to send test messages to each other.
 
 ### 0.3 Next actions, in order
 
 1. **Phone-check results:** record them in §7 (Phase 0 and Phase 1 progress tables) and the `usage.ps1` numbers in §5.8. Fix anything that failed. Reminder reliability on the Poco (HyperOS) is the most likely problem (§6).
-2. **Release `main`:** merge `develop` into `main` (fast-forward), tag `phase-1`, push both.
+2. **Tag the release:** tag `phase-1` on `main` and push the tag.
 3. **Phase 2** (§7), in this order:
    1. A **debug-only notification recorder** comes first. Using test messages with fake content sent between the two phones, it saves the raw notification extras as JSON fixtures. This shows what WhatsApp (with several accounts), Messenger, Gmail and Keep reminders really post on HyperOS and on the Pixel, and especially where the **WhatsApp account** appears (§5.1).
    2. Per-app parsers, built and tested against those fixtures (`src/test`, Robolectric).
@@ -610,7 +610,7 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | Package ID? | `dev.maahdi.mavick` (debug: `dev.maahdi.mavick.debug`) | Used from Phase 0 |
 | Phone resource limits? | Storage and CPU must stay low, and the phone must never hang | §5.8 budgets, enforced by build checks. Smallest AI model first. Release build for daily use. |
 | Testing on the phones? | Check each phase on both phones before starting the next | Phase 0 + 1 check now ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)). Phase 2 is built from real notifications captured on your phones. |
-| Git workflow? | Push to GitHub; work on `develop`, merge to `main` after the phone check | §0.1 |
+| Git workflow? | Push to GitHub; work on `develop`, merge into `main` and push both (merged early, before the phone check, at the user's request) | §0.1 |
 | Work days? | Usually Sunday to Thursday, but messages come every day | "Every work day" repeats use Sun–Thu (changeable in Settings). Everything else, including the morning briefing and message reading, runs all 7 days. |
 | What does 12/10 mean? | 12 October (day/month) | Quick-add reads numeric dates as day/month (changeable in Settings) |
 
@@ -628,7 +628,7 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 **Still open**
 
 1. **How are the multiple WhatsApp accounts set up on each phone?** WhatsApp's own account switcher, or a clone such as Xiaomi "Dual apps"? Phase 2's notification recorder will verify this either way.
-2. **Merge `develop` into `main`:** after the phone check passes (the user's OK).
+2. **Tag `phase-1`:** after the phone check passes.
 3. **Background queue for the AI (Phase 3):** WorkManager (needs `WAKE_LOCK` and `FOREGROUND_SERVICE` on the allow-list) or an alarm-driven loop. Decide in Phase 3 after measuring.
 
 ---
