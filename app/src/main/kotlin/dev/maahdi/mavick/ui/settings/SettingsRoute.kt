@@ -40,15 +40,17 @@ import dev.maahdi.mavick.health.StorageStatus
 import dev.maahdi.mavick.security.canAuthenticate
 import dev.maahdi.mavick.ui.PhoneSettings
 import dev.maahdi.mavick.ui.PickedFile
+import java.io.IOException
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: () -> Unit) {
+fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeepImport: (uri: String) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
@@ -59,6 +61,7 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
     var disconnects by remember { mutableIntStateOf(0) }
     // The model file picked last, offered for deletion once Mavick has its own copy.
     var pickedModel by remember { mutableStateOf<Uri?>(null) }
+    var exportOutcome by remember { mutableStateOf<ExportOutcome?>(null) }
     LifecycleResumeEffect(Unit) {
         // Re-read when coming back from Android's settings, where the user may have fixed something.
         health = readHealth(context, container)
@@ -70,6 +73,12 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
         disconnects = countRecentDisconnects(container)
     }
     BackHandler(onBack = onBack)
+    val pickTakeout = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onOpenKeepImport(uri.toString())
+    }
+    val saveExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) scope.launch { exportOutcome = writeAccuracyExport(container, context, uri) }
+    }
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val file = PickedFile.from(context.contentResolver, uri)
@@ -82,6 +91,7 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
         settings = settings,
         health = health.copy(storage = storage, disconnectsThisWeek = disconnects),
         ai = ai,
+        exportOutcome = exportOutcome,
         now = Instant.now(container.clock()),
         zone = container.clock().zone,
         use24Hour = DateFormat.is24HourFormat(context),
@@ -101,12 +111,19 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
         },
         onOpenAutostart = { PhoneSettings.open(context, PhoneSettings.xiaomiAutostart()) },
         onOpenReading = onOpenReading,
-        onDeleteAllMessages = { scope.launch { container.openMessages().deleteAll() } },
+        onDeleteAllMessages = {
+            scope.launch {
+                container.openMessages().deleteAll()
+                container.clearSuggestionsNotificationIfNone()
+            }
+        },
         // Any file: phones don't know a type for .litertlm. The import checks the file itself.
         onImportModel = { pickModel.launch(arrayOf("*/*")) },
         onCheckModel = aiViewModel::check,
         onRemoveModel = aiViewModel::remove,
         onTurnModelOnAgain = aiViewModel::turnOnAgain,
+        onExportMessages = { saveExport.launch("mavick-messages-${LocalDate.now(container.clock())}.csv") },
+        onImportKeep = { pickTakeout.launch(TAKEOUT_TYPES) },
         onBack = onBack,
     )
 
@@ -125,6 +142,26 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: ()
         )
     }
 }
+
+/** Writes the accuracy-check export to the file you chose. Any failure (storage, the file) says only that it failed. */
+private suspend fun writeAccuracyExport(container: AppContainer, context: Context, uri: Uri): ExportOutcome = try {
+    val file = container.exportForAccuracyCheck()
+    withContext(Dispatchers.IO) {
+        val output = context.contentResolver.openOutputStream(uri) ?: throw IOException("No access to the chosen file")
+        output.use { it.write(file.csv.toByteArray(Charsets.UTF_8)) }
+    }
+    ExportOutcome.Saved(file.count)
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    Log.w("Mavick", "Export failed: ${e.javaClass.simpleName}")
+    ExportOutcome.Failed
+} catch (e: LinkageError) {
+    ExportOutcome.Failed // the encryption library failed to load; Health explains it
+}
+
+/** How phones label a Takeout .zip; the import checks the file itself. */
+private val TAKEOUT_TYPES = arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")
 
 /** After an import: the copy in Downloads is no longer needed. Tells you if it couldn't be deleted. */
 @Composable

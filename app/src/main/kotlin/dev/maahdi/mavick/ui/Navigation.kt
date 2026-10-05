@@ -33,6 +33,9 @@ sealed interface Destination {
 
     /** Tasks found in messages, waiting for you (Phase 3). */
     data object Suggestions : Destination
+
+    /** Notes from a Google Takeout export ([uri], as picked), to choose which become tasks (Phase 3). */
+    data class KeepImport(val uri: String) : Destination
 }
 
 /**
@@ -60,6 +63,8 @@ class NavigationViewModel : ViewModel() {
     fun openReading() = push(Destination.Reading)
 
     fun openSuggestions() = push(Destination.Suggestions)
+
+    fun openKeepImport(uri: String) = push(Destination.KeepImport(uri))
 
     /** Opens an editor; an editor already open is replaced, so only one exists at a time. */
     fun openEditor(taskId: String? = null, draft: TaskDraft? = null, fromShare: Boolean = false, suggestionId: String? = null) {

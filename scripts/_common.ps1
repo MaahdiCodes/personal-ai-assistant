@@ -9,6 +9,12 @@ $AppPackage = 'dev.maahdi.mavick'
 $DebugAppPackage = "$AppPackage.debug"
 $MainActivityClass = 'dev.maahdi.mavick.MainActivity'
 
+# Where the on-phone tests and the accuracy check find an AI model and a labelled file. Test apps
+# read them there; Mavick itself imports its model through Settings. LiteRtLmDeviceTest uses the
+# same model path.
+$PhoneTestFolder = '/data/local/tmp/mavick'
+$PhoneTestModel = "$PhoneTestFolder/model.litertlm"
+
 function Write-Step([string] $Message) {
     Write-Host ''
     Write-Host "==> $Message" -ForegroundColor Cyan

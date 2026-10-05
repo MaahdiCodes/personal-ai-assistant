@@ -12,8 +12,15 @@ reminders with Done / Snooze / Tomorrow, a daily morning briefing, app lock, and
 from Google Keep. Mavick also reads WhatsApp, Messenger, Gmail and Keep notifications (read-only:
 it never sends, marks as read or dismisses anything), skips the chats, people and words you
 exclude, and keeps the rest encrypted for 14 days in its Inbox, where any message becomes a task.
-"Add to Mavick" works on text selected in any app. To check it on a phone, follow
-[docs/PHONE_CHECKLIST.md](docs/PHONE_CHECKLIST.md).
+"Add to Mavick" works on text selected in any app.
+
+**Phase 3:** Mavick suggests tasks it finds in those messages, for you to add, edit or ignore. An
+AI model running on the phone (Gemma 3 1B, imported as a file: the app still has no internet)
+does the reading; without one, simple rules do. Keep notes can be imported from a Google Takeout
+export, and an accuracy check measures the suggestions against your own labels
+([eval/README.md](eval/README.md)).
+
+To check it all on a phone, follow [docs/PHONE_CHECKLIST.md](docs/PHONE_CHECKLIST.md).
 
 ## Scripts
 
@@ -28,6 +35,8 @@ Run these from the project folder in PowerShell.
 | `.\scripts\usage.ps1 [-Phone pixel\|poco]` | Shows Mavick's storage, memory and CPU use, plus anything it runs in the background. |
 | `.\scripts\logs.ps1 [-Phone pixel\|poco]` | Shows Mavick's live log. Message contents are never logged. |
 | `.\scripts\record-notifications.ps1 -Start\|-Stop [-Phone pixel\|poco]` | Records raw notifications with the "Mavick Debug" app, to check the parsers. Fake test messages only; files go to the git-ignored `recordings` folder. |
+| `.\scripts\push-model.ps1 -Model <file> [-Phone pixel\|poco] [-ForTests]` | Copies an AI model (.litertlm) to the phone and checks the copy: to Downloads for Mavick to import, or with `-ForTests` for the on-phone tests and the accuracy check. |
+| `.\scripts\eval.ps1 [-Fetch] [-Set <file>] [-Phone pixel\|poco]` | The accuracy check ([eval/README.md](eval/README.md)): `-Fetch` brings an export to the git-ignored `eval\private`; without it, runs the labelled file on the phone and prints the report. |
 
 `-Phone` matches part of the phone's name (`pixel`, `poco`) or its serial. You only need it when
 both phones are connected.
@@ -46,7 +55,8 @@ both phones are connected.
 - **Service allow-list:** the notification listener is the only service, and only Android can bind it.
 - **Read-only check:** the build fails if any code could answer, open, dismiss or snooze another
   app's notification, or read the screen (docs/PLAN.md §5.1).
-- **Size budget:** the build fails if the release APK grows past its budget (docs/PLAN.md §5.8).
+- **Size budget:** the build fails if the release APK grows past its budget (docs/PLAN.md §5.8):
+  30 MB, most of it the on-device AI runtime.
 
 ## Signing key
 

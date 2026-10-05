@@ -13,6 +13,7 @@ import dev.maahdi.mavick.testing.testModelStore
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -22,6 +23,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class ModelManagerTest {
     @get:Rule

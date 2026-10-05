@@ -16,6 +16,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -85,6 +86,7 @@ class FakeDailyChores(private val failCleanUp: Boolean = false) : DailyChores {
 }
 
 /** Runs ViewModels' coroutines (Dispatchers.Main) at once, on the test thread. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(private val dispatcher: TestDispatcher = UnconfinedTestDispatcher()) : TestWatcher() {
     override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
 

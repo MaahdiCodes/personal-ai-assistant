@@ -14,6 +14,8 @@ import dev.maahdi.mavick.ai.ModelStore
 import dev.maahdi.mavick.ai.RuleExtractor
 import dev.maahdi.mavick.ai.SuggestionQueue
 import dev.maahdi.mavick.ai.SuggestionWorker
+import dev.maahdi.mavick.ai.eval.EvalExport
+import dev.maahdi.mavick.ai.eval.EvalExportFile
 import dev.maahdi.mavick.capture.CaptureChores
 import dev.maahdi.mavick.capture.CaptureStatusStore
 import dev.maahdi.mavick.capture.MavickNotificationListener
@@ -170,10 +172,24 @@ class AppContainer(context: Context) {
         )
     }
 
+    /** Your messages as a file for the accuracy check, on request only (Settings › Suggestions). */
+    suspend fun exportForAccuracyCheck(): EvalExportFile = offMain { EvalExport(messages, exclusions, settings, clock) }.export()
+
     /** Updates the suggestions notification to what is waiting now. */
     suspend fun showSuggestionsNotification() {
         notifier.showSuggestions(suggestions.countNew(), suggestions.newTitles())
     }
+
+    /**
+     * After messages were deleted (and their suggestions with them): removes the suggestions
+     * notification once nothing waits. A notification still true is left alone, not posted again.
+     */
+    suspend fun clearSuggestionsNotificationIfNone() {
+        if (suggestions.countNew() == 0) notifier.cancelSuggestions()
+    }
+
+    /** Suggestions waiting, for the briefing; none while suggestions are switched off. */
+    private suspend fun suggestionsForBriefing(): Int = if (settings.current.suggestionsEnabled) suggestions.countNew() else 0
 
     private val captureChores by lazy {
         CaptureChores(messages, healthEvents, settings, captureStatus, ::hasNotificationAccess, notifier::showReadingWarning, clock)
@@ -181,7 +197,11 @@ class AppContainer(context: Context) {
 
     /** The daily alarm's chores: message reading's, then another chance for messages left waiting. */
     private val dailyChores = object : DailyChores {
-        override suspend fun cleanUp() = captureChores.cleanUp()
+        override suspend fun cleanUp() {
+            captureChores.cleanUp()
+            // Old messages went, and their suggestions with them.
+            clearSuggestionsNotificationIfNone()
+        }
 
         override suspend fun daily() {
             captureChores.daily()
@@ -191,7 +211,7 @@ class AppContainer(context: Context) {
     }
 
     val reminderEngine: ReminderEngine by lazy {
-        ReminderEngine(tasks, notifier, reminderScheduler, settings, clock, dailyChores, countSuggestions = { suggestions.countNew() })
+        ReminderEngine(tasks, notifier, reminderScheduler, settings, clock, dailyChores, countSuggestions = ::suggestionsForBriefing)
     }
 
     val appLock: AppLock by lazy {

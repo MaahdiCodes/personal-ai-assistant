@@ -47,6 +47,14 @@ object ExclusionEngine {
         return CaptureDecision.Read()
     }
 
+    /**
+     * Whether the rules as they are now would read a message saved earlier: for the AI and the
+     * accuracy-check export, so a rule added later still keeps its text out. A pause doesn't count,
+     * as the message was read before it.
+     */
+    fun stillAllows(message: IncomingMessage, rules: List<ExclusionRuleEntity>, appCapture: (SourceApp) -> AppCapture, now: Instant): Boolean =
+        decide(message, rules, appCapture, CapturePause.Off, now) is CaptureDecision.Read
+
     fun matches(rule: ExclusionRuleEntity, message: IncomingMessage): Boolean {
         if (rule.app != null && rule.app != message.app) return false
         if (rule.accountKey != null && rule.accountKey != message.accountKey) return false

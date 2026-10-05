@@ -1,11 +1,13 @@
 package dev.maahdi.mavick.ui.settings
 
 import android.text.format.Formatter
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -34,12 +36,23 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 
-/** Settings › Suggestions: the switch, the AI model (import, check, remove) and what the AI did. */
+/** How the last accuracy-check export went. */
+sealed interface ExportOutcome {
+    data class Saved(val count: Int) : ExportOutcome
+
+    data object Failed : ExportOutcome
+}
+
+/**
+ * Settings › Suggestions: the switch, the AI model (import, check, remove), what the AI did, and the
+ * export for an accuracy check.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SuggestionsSection(
     settings: AppSettings,
     ai: AiSettingsState,
+    exportOutcome: ExportOutcome?,
     now: Instant,
     zone: ZoneId,
     use24Hour: Boolean,
@@ -48,8 +61,10 @@ fun SuggestionsSection(
     onCheckModel: () -> Unit,
     onRemoveModel: () -> Unit,
     onTurnModelOnAgain: () -> Unit,
+    onExportMessages: () -> Unit,
 ) {
     var confirmRemove by remember { mutableStateOf(false) }
+    var confirmExport by remember { mutableStateOf(false) }
     val context = LocalContext.current
     Text(stringResource(R.string.settings_suggestions), style = MaterialTheme.typography.titleMedium)
     SwitchRow(
@@ -116,6 +131,34 @@ fun SuggestionsSection(
     }
     activity(ai.status, now)?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Column(Modifier.fillMaxWidth().clickable { confirmExport = true }.padding(vertical = 4.dp)) {
+        Text(stringResource(R.string.ai_export), style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.ai_export_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        when (exportOutcome) {
+            is ExportOutcome.Saved -> Text(
+                pluralStringResource(R.plurals.ai_export_saved, exportOutcome.count, exportOutcome.count),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            ExportOutcome.Failed -> Text(stringResource(R.string.ai_export_failed), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            null -> Unit
+        }
+    }
+
+    if (confirmExport) {
+        AlertDialog(
+            onDismissRequest = { confirmExport = false },
+            title = { Text(stringResource(R.string.ai_export_confirm_title)) },
+            text = { Text(stringResource(R.string.ai_export_confirm_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmExport = false
+                    onExportMessages()
+                }) { Text(stringResource(R.string.ai_export_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmExport = false }) { Text(stringResource(R.string.dialog_cancel)) } },
+        )
     }
 
     val model = ai.model

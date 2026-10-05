@@ -1,0 +1,13 @@
+﻿id,expected_actionable,expected_title,expected_when,label_note,app,chat,is_group,sender,from_me,partial,posted_at,text,context_1_sender,context_1_from_me,context_1_text,context_2_sender,context_2_from_me,context_2_text,context_3_sender,context_3_from_me,context_3_text
+sample-01,y,Send the signed form to Sam,2026-10-08 17:00,,WHATSAPP,Sam,n,Sam,n,n,2026-10-05T10:00+06:00,Can you send me the signed form by Thursday 5pm?,,,,,,,,,
+sample-02,n,,,,WHATSAPP,Family,y,Rina,n,n,2026-10-05T10:00+06:00,haha that photo 😂,,,,,,,,,
+sample-03,y,Pay the electricity bill,2026-10-07,,WHATSAPP,Home,y,Karim,n,n,2026-10-05T10:00+06:00,"Electricity bill is due on Wednesday, can you pay it?",,,,,,,,,
+sample-04,y,Bring the cake,2026-10-06 17:00,,WHATSAPP,Family,y,Rina,n,n,2026-10-05T10:00+06:00,"Party tomorrow at 5, you bring the cake ok?",Sam,n,Who is bringing what?,,,,,,
+sample-05,n,,,,MESSENGER,Nadia,n,Nadia,n,n,2026-10-05T10:00+06:00,Good morning! How was the trip?,,,,,,,,,
+sample-06,y,Call the bank about the card,2026-10-05 15:00,,GMAIL,City Bank,n,City Bank,n,n,2026-10-05T10:00+06:00,Your card: please call us today at 3pm to confirm a payment.,,,,,,,,,
+sample-07,y,Send the report,2026-10-05 20:00,your own promise,WHATSAPP,Boss,n,,y,n,2026-10-05T10:00+06:00,I'll send the report tonight,Boss,n,Where is the report?,,,,,,
+sample-08,n,,,,WHATSAPP,Work,y,Tanvir,n,n,2026-10-05T10:00+06:00,"The meeting went well, thanks everyone",,,,,,,,,
+sample-09,y,Buy milk,,a Keep reminder,KEEP,,n,,n,n,2026-10-05T10:00+06:00,Buy milk,,,,,,,,,
+sample-10,n,,,,WHATSAPP,Family,y,Sam,n,n,2026-10-05T10:00+06:00,ok 👍,Rina,n,Dinner at 8 tonight?,,y,yes,,,
+sample-11,y,Pay the school fees,,the date can't be read,WHATSAPP,School parents,y,Teacher,n,n,2026-10-05T10:00+06:00,Reminder: school fees must be paid by the end of the month,,,,,,,,,
+sample-12,,,,not labelled yet: left out of the scores,WHATSAPP,Sam,n,Sam,n,n,2026-10-05T10:00+06:00,See you,,,,,,,,,

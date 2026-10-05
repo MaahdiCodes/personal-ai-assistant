@@ -1,8 +1,8 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phases 0–2 are coded and pass 464 PC tests. Phase 2 (reading WhatsApp, Messenger, Gmail and Keep notifications) is new and has not run on a phone yet. Phases 0–1 run on the Pixel 7 Pro; the full phone check on both phones is still pending.
-> **Last updated:** 2026-10-05, after building Phase 2.
-> **Next step:** the user installs the new build, turns on Notification access and records test notifications (§0.2) → the parsers are checked against the recordings → phone checks of Phases 0–2 → tags `phase-1`, `phase-2`.
+> **Status:** Phases 0–3 are coded and pass 704 PC tests. Phase 3 (suggested tasks from messages, on-device AI, Keep Takeout import, accuracy check) is new and has not run on a phone. Phases 0–1 run on the Pixel 7 Pro; no phase has had its full phone check yet.
+> **Last updated:** 2026-10-05, after building Phase 3.
+> **Next step:** the user installs 0.4.0, imports the Gemma 3 1B model, runs the phone checks of Phases 0–3 (PHONE_CHECKLIST.md) and the recorder session → fixes → accuracy check on real labelled messages (eval/README.md) → tags.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
 
@@ -20,7 +20,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 | 0. Foundation | Project, encrypted storage, safety checks, scripts | 🧪 Code and tests done. Runs on the Pixel; full phone check pending. |
 | 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done. Runs on the Pixel; full phone check pending. |
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail / Keep notifications, rules about what to read, Inbox | 🧪 Code and tests done (464 PC tests in total). Not yet on a phone. WhatsApp's own account switcher is not told apart yet (§5.1). |
-| 3. AI suggestions | On-device AI turning messages into suggested tasks | 🔨 In progress (2026-10-05): suggestions from messages built and tested (AI runtime, queue, Suggestions screen, Settings › Suggestions); Keep Takeout import, accuracy-check tools and this plan's Phase 3 sections still to come. |
+| 3. AI suggestions | On-device AI turning messages into suggested tasks | 🧪 Code and tests done (704 PC tests in total). Not yet on a phone: the AI runtime has never run on a device, and the accuracy targets need the user's labelled messages. |
 | 4. Calendar + planning | Calendar sync, clashes, widget | ⬜ |
 | 5. Backups + hardening | Encrypted Google Drive backups, reliability | ⬜ |
 | 6. Combined task list | One list across both phones | ⬜ |
@@ -36,14 +36,24 @@ This document is the single source of truth for the project. **§0 is the hand-o
   - The debug build has a notification recorder for checking the parsers (`scripts/record-notifications.ps1`); the release build contains none of it.
 - **Long messages, measured:** in Android 16's own code, a 3,000-character message keeps all 3,000 characters in the notification's data when the app builds it with AndroidX, and is cut to 1,024 when it uses Android's builder; the shade shows less either way. Mavick reads the data directly, so it gets whole messages from AndroidX apps. Cut text is marked "Cut short" (§5.1).
 - **Safety audit (2026-10-05, before the first install):** Phases 0–1 can't affect any account (no internet permission, no account access, no access to other apps' data) or harm the phone (no background service, no setting changes, read-only `adb` use, uninstall removes everything). Fixed then: Fix buttons fall back to App info instead of crashing; shared styled text is accepted. Phase 2 keeps those properties: still no internet, and the only new service is the listener, which only Android can bind.
-- **Versions:** app `versionCode 3`, `versionName 0.3.0`; database version 3.
+- **Phase 3 as built** (§5.3):
+  - `ai/`: `Prefilter` → three earlier messages as context → `GemmaExtractor` (LiteRT-LM 0.16.1, JSON constrained to a schema, checked by `ExtractionJson`, one retry) or `RuleExtractor` when no model can be used → `WhenResolver` (WhenParser, counted from the message's time) → saved unless a near-duplicate (`TitleSimilarity`). Exclusion rules are re-checked first (`ExclusionEngine.stillAllows`), for the context too.
+  - Runtime: `SuggestionWorker` (one background-priority thread, 2 CPU threads; woken by saved messages, app start and the daily alarm; no new service, job, alarm, wake lock or permission). `ModelHost` loads the model on use and closes it 1 minute after the work; a failure rests the model for 1 hour; a message is marked FAILED before the model reads it; 2 interrupted model runs in a row switch the model off. Pauses on low battery, Battery Saver or a warm phone.
+  - Screens: Suggested tasks (Add, Edit, Ignore, Never read this chat, Undo), a banner on the task list, a quiet Suggestions notification, the briefing count, Settings › Suggestions (switch, Import model / Check / Remove / Turn on again, counts, export for the accuracy check), Settings › Google Keep (Takeout import with a choose-the-notes screen).
+  - Database version 4: `suggestion` table, deleted with its message (foreign-key cascade).
+  - Accuracy check: `ai/eval` (CSV export, labelled-file reader, runner, scorer), `ExtractionEvalRun` (on the phone), `scripts/eval.ps1`, `scripts/push-model.ps1`, `eval/README.md`, `eval/sample.csv` (made-up messages).
+  - Release APK 25.6 MB: the budget was raised from 8 to 30 MB on purpose, for the AI runtime's 21.5 MB of native code (§10). R8 keep rules cover its JNI classes; kotlin-reflect is excluded. Whether R8 left the runtime working can only be seen on a phone: import the model in the release app and press Check.
+  - The Part 1 commit message says 645 tests; it was 642 at that point.
+- **Versions:** app `versionCode 4`, `versionName 0.4.0`; database version 4.
 
 ### 0.2 Waiting on the user
 
 1. **Install the Phase 2 build** on the Pixel: `.\scripts\install.ps1 -Phone pixel`. Then Settings › Health › Notification access › **Fix**. If Android says "Restricted setting": App info › ⋮ › *Allow restricted settings*, then try again.
 2. **Recorder session** (the planned first step of Phase 2, now possible): install the debug app with `.\scripts\install.ps1 -DebugBuild -Phone pixel` and give **Mavick Debug** notification access too. Run `.\scripts\record-notifications.ps1 -Phone pixel -Start`. Send **fake** test messages from the other phone to every WhatsApp account, Messenger and Gmail, including long ones (about 300, 1,500 and 5,000 characters), then run `-Stop` and give Claude the `recordings` folder. This confirms the parsers and shows where WhatsApp names the account.
 3. **Open question 1 (§10):** how the several WhatsApp accounts are set up on each phone (WhatsApp's own "Add account", WhatsApp Business, or a clone such as Xiaomi "Dual apps").
-4. **Phone checks** on **both** phones: Phases 0 + 1 and Phase 2 ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)); share the filled-in results tables.
+4. **Phone checks** on **both** phones: Phases 0–3 ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md); section 9 is Phase 3); share the filled-in results tables.
+5. **AI model:** download `gemma3-1b-it-int4.litertlm` from https://huggingface.co/litert-community/Gemma3-1B-IT (accept the Gemma terms), then `.\scripts\push-model.ps1` (checklist §9).
+6. **Accuracy check:** export, label 100–200 messages, run `.\scripts\eval.ps1` ([eval/README.md](../eval/README.md)); share only `report.txt`.
 5. **Signing key backup:** the key exists (`keystore.properties`, git-ignored); make sure the `.p12` file is in Google Drive and on a USB drive, and the password is stored elsewhere (§5.7 B).
 
 ### 0.3 Next actions, in order
@@ -51,7 +61,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 1. **Recordings in:** check the parsers against them (Robolectric tests that load each recording). Add WhatsApp account detection from the field the recordings show, adjust the noise texts, and confirm where long messages are cut. Turn chosen recordings into committed fixtures with fake content only and phone numbers replaced (shortcut IDs contain them).
 2. **Phone-check results:** record them in §7 and the `usage.ps1` numbers in §5.8. Fix anything that failed. The Poco (HyperOS) is the most likely to stop the listener or delay alarms (§6).
 3. **Tags:** `phase-1`, then `phase-2`, on `main`, and push them.
-4. **Phase 3** (§5.3, §7): model import, rule prefilter, `GemmaExtractor`, suggestions. Messages are already stored with `aiState = PENDING` for it.
+4. **Phase 3 on the phone:** fix what the checks find. First suspects: R8 in the release build, test apps reading `/data/local/tmp`, constrained JSON with Gemma 3 1B. Tune the prompt and prefilter with the accuracy report until precision ≥ 85% and recall ≥ 70%, then tag `phase-3`. Only then Phase 4.
 5. After each step, update this document (§0 and the §7 tables) and push `develop`.
 
 ### 0.4 How to resume in a new session
@@ -525,7 +535,7 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 
 | Resource | Budget | How it is enforced or checked |
 |---|---|---|
-| App size | Release APK **≤ 8 MB** (Phase 0: 3.3 MB, Phase 1: 4.5 MB, Phase 2: 4.7 MB) | The build fails above budget (`checkReleaseApkSize`). Raising a budget needs a deliberate change here. |
+| App size | Release APK **≤ 30 MB** (Phase 0: 3.3 MB, Phase 1: 4.5 MB, Phase 2: 4.7 MB, Phase 3: 25.6 MB, of which 21.5 MB is the AI runtime; raised from 8 MB on purpose, §10) | The build fails above budget (`checkReleaseApkSize`). Raising a budget needs a deliberate change here. |
 | Code shipped | 64-bit ARM native code only, English resources only, unused code stripped (R8) | `abiFilters`, `localeFilters` and `isMinifyEnabled` in `app/build.gradle.kts` |
 | App data | Typically a few MB | Raw messages deleted after 14 days (§5.6). `usage.ps1` shows data + cache. |
 | AI model (Phase 3) | **Gemma 3 1B, about 0.5 GB**. E2B (about 3 GB) only with your OK. | Optional import. Mavick works without a model. |
@@ -640,6 +650,21 @@ Times assume part-time work, with Claude writing most of the code.
 | PC tests + Lint | ✅ 464 tests passing, Lint: no issues |
 | Release APK | ✅ 4.7 MB (budget 8 MB). Same 4 permissions. 1 service (the listener). No recorder code. |
 | Phone check (50 test messages to every WhatsApp account, no duplicates, listener survives 48 h on the Poco) | ⏳ [PHONE_CHECKLIST.md](PHONE_CHECKLIST.md) §8 |
+
+
+**Phase 3 progress (2026-10-05)**
+
+| Item | Status |
+|---|---|
+| Prefilter, context, AI and rules extractors, JSON checks, dates, near-duplicates | ✅ Built and tested on the PC |
+| On-device runtime (LiteRT-LM 0.16.1), model import / check / remove, crash and battery guards | ✅ Built. ⏳ Never run on a phone |
+| Suggested tasks screen, banner, notification, briefing, Settings › Suggestions | ✅ Built, with Compose UI tests |
+| Database version 4 (suggestion table), migration test | ✅ |
+| Keep Takeout import | ✅ Built against Takeout's layout with made-up exports. ⏳ Check with a real export |
+| Accuracy check: export, eval.ps1, push-model.ps1, on-phone runner | ✅ Built. ⏳ Labelled set and report |
+| PC tests + Lint | ✅ 704 tests, Lint: no issues |
+| Release APK | ✅ 25.6 MB (budget raised to 30 MB). Same 4 permissions, 1 service |
+| Targets: precision ≥ 85%, recall ≥ 70%, ≤ 10 s per message, battery, warmth | ⏳ On the phones |
 
 ---
 
@@ -757,11 +782,23 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | Health "Restart" switches the listener component off and on | The documented `requestRebind` does nothing for a listener Android still thinks is bound; the switch makes Android connect it afresh |
 | WhatsApp's own account switcher not told apart until the recordings | Guessing a field (like the sub-text, which may hold "3 new messages") could split one account into many and break dedup |
 
+**Decided during Phase 3 (2026-10-05)**
+
+| Decision | Why |
+|---|---|
+| Built Phase 3 before the phone checks of Phases 0–2, as with Phase 2 | The user asked to go on once earlier phases were done; all were coded and green, and the rest needs the phones |
+| AI work rides on existing wake-ups in Mavick's process (no WorkManager, JobScheduler or new service) | Settles open question 3: no new permission or service; a background-priority thread with crash and battery guards keeps the listener safe |
+| Release APK budget raised from 8 to 30 MB | The approved on-device AI needs LiteRT-LM's 21.5 MB native library; stored uncompressed, so Android unpacks no second copy |
+| LiteRT-LM 0.16.1, not 0.17 | 0.17 needs Kotlin 2.4 libraries; lift with the other pins (§0.8) |
+| "Never from this chat" reuses "Never read this chat" | One rule type, already tested; deletes the chat's messages and their suggestions |
+| Suggestions live and die with their message | Nothing from a raw message outlives the retention period, except tasks you add |
+| Accuracy check: label on the PC, run on the phone | The user labels in a spreadsheet; reports are numbers only; real messages stay in eval/private |
+
 **Still open**
 
 1. **How are the multiple WhatsApp accounts set up on each phone?** WhatsApp's own account switcher, WhatsApp Business, or a clone such as Xiaomi "Dual apps"? Clones and Business already work; the recordings settle the switcher.
 2. **Tags `phase-1` and `phase-2`:** after the phone checks pass.
-3. **Background queue for the AI (Phase 3):** WorkManager (needs `WAKE_LOCK` and `FOREGROUND_SERVICE` on the allow-lists) or an alarm-driven loop. Decide in Phase 3 after measuring.
+3. ~~Background queue for the AI~~: decided in Phase 3 (no new job or service; see above).
 
 ---
 

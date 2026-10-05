@@ -27,7 +27,13 @@ The rules that matter most:
   notification, or read the screen (no read receipts, no "online", no lost notifications).
   `checkReadOnlyNotifications` fails the build on the APIs that could; don't name them in
   comments either.
-- **Privacy:** never log task or message content, and never commit real messages.
+- **Privacy:** never log task or message content, and never commit real messages. Don't open
+  `eval/private/` (the user's real messages, for the accuracy check) unless the user asks:
+  reading it would send them off the PC. The reports' `report.txt` holds numbers only and may be
+  shared by the user.
+- **AI on the phone:** the AI runtime (LiteRT-LM) is touched only by `ai/LiteRtLmModel.kt`;
+  everything else uses `LanguageModel`. AI work runs on the low-priority AI thread, never in the
+  listener's queue or on the main thread.
 - **Signing key:** never create the user's release signing key or handle its password. The user
   runs `scripts/new-signing-key.ps1` themselves.
 - **The user:** values well-tested, DRY, explicit code and the handling of edge cases. When asked

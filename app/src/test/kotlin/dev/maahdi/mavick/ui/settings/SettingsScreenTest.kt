@@ -36,12 +36,13 @@ class SettingsScreenTest {
     private var settings = AppSettings()
     private val calls = mutableListOf<String>()
 
-    private fun show(health: HealthInfo, ai: AiSettingsState = AiSettingsState()) {
+    private fun show(health: HealthInfo, ai: AiSettingsState = AiSettingsState(), exportOutcome: ExportOutcome? = null) {
         compose.setContent {
             SettingsScreen(
                 settings = settings,
                 health = health,
                 ai = ai,
+                exportOutcome = exportOutcome,
                 now = now,
                 zone = TEST_ZONE,
                 use24Hour = true,
@@ -57,6 +58,8 @@ class SettingsScreenTest {
                 onCheckModel = { calls += "check" },
                 onRemoveModel = { calls += "remove" },
                 onTurnModelOnAgain = { calls += "turn on" },
+                onExportMessages = { calls += "export" },
+                onImportKeep = { calls += "keep" },
                 onBack = {},
             )
         }
@@ -163,6 +166,39 @@ class SettingsScreenTest {
         compose.onNodeWithText("What Mavick reads").performScrollTo().performClick()
 
         assertThat(calls).containsExactly("reading")
+    }
+
+    @Test
+    fun `exporting messages for an accuracy check warns first`() {
+        show(working)
+
+        compose.onNodeWithText("Export messages for an accuracy check…").performScrollTo().performClick()
+        assertThat(calls).isEmpty()
+        compose.onNodeWithText("The file holds up to 300 of your newest messages in plain text", substring = true).assertExists()
+        compose.onNodeWithText("Choose where to save").performClick()
+
+        assertThat(calls).containsExactly("export")
+    }
+
+    @Test
+    fun `the export says how it went`() {
+        show(working, exportOutcome = ExportOutcome.Saved(187))
+        compose.onNodeWithText("187 messages exported.").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `a failed export says so`() {
+        show(working, exportOutcome = ExportOutcome.Failed)
+        compose.onNodeWithText("The file couldn't be saved.").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `Keep notes can be imported from a Takeout export`() {
+        show(working)
+
+        compose.onNodeWithText("Import notes from Google Takeout…").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("keep")
     }
 
     @Test

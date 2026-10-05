@@ -1,7 +1,5 @@
 package dev.maahdi.mavick.ai
 
-import dev.maahdi.mavick.capture.CaptureDecision
-import dev.maahdi.mavick.capture.CapturePause
 import dev.maahdi.mavick.capture.ExclusionEngine
 import dev.maahdi.mavick.data.message.AiState
 import dev.maahdi.mavick.data.message.MessageEntity
@@ -126,9 +124,8 @@ class SuggestionQueue(
         return 0
     }
 
-    /** Whether the capture rules would still read [message] (a pause doesn't count: it was read already). */
     private fun allowed(message: MessageEntity, activeRules: List<ExclusionRuleEntity>): Boolean =
-        ExclusionEngine.decide(message.asIncoming(), activeRules, settings.current::captureFor, CapturePause.Off, now()) is CaptureDecision.Read
+        ExclusionEngine.stillAllows(message.asIncoming(), activeRules, settings.current::captureFor, now())
 
     private fun chatLine(message: MessageEntity) = ChatLine(message.sender, message.isFromMe, message.text)
 

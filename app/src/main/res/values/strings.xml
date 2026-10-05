@@ -320,4 +320,45 @@
     <string name="ai_paused_battery_low">waiting: battery below %1$d%%</string>
     <string name="ai_paused_battery_saver">waiting: Battery Saver is on</string>
     <string name="ai_paused_hot">waiting: the phone is warm</string>
+    <string name="ai_export">Export messages for an accuracy check…</string>
+    <string name="ai_export_summary">Your newest messages as a file to label on the PC, to measure how well suggestions work (eval/README.md).</string>
+    <string name="ai_export_confirm_title">Export your messages?</string>
+    <string name="ai_export_confirm_text">The file holds up to 300 of your newest messages in plain text; chats and words you excluded are left out. Save it to Downloads, then fetch it on the PC with the eval script (eval/README.md), which copies it to eval/private and deletes it from the phone.</string>
+    <string name="ai_export_confirm">Choose where to save</string>
+    <string name="ai_export_failed">The file couldn\'t be saved.</string>
+    <plurals name="ai_export_saved">
+        <item quantity="one">%d message exported.</item>
+        <item quantity="other">%d messages exported.</item>
+    </plurals>
+
+    <!-- Google Keep import from Takeout (Phase 3) -->
+    <string name="settings_keep">Google Keep</string>
+    <string name="settings_keep_import">Import notes from Google Takeout…</string>
+    <string name="settings_keep_import_summary">Export Keep at takeout.google.com as a .zip, copy it to the phone and pick it here. You choose which notes become tasks; nothing else from the export is kept.</string>
+    <string name="keep_import_title">Import from Google Keep</string>
+    <string name="keep_import_reading">Reading the export…</string>
+    <string name="keep_import_unreadable">Mavick couldn\'t open that file. Pick it again.</string>
+    <string name="keep_import_not_a_zip">This isn\'t a Google Takeout .zip. At takeout.google.com, export Keep as a .zip, then pick that file.</string>
+    <string name="keep_import_too_big">This file is far bigger than a Keep export. At takeout.google.com, export only Keep.</string>
+    <string name="keep_import_none">No Keep notes in this export.</string>
+    <string name="keep_import_select_all">Select all</string>
+    <string name="keep_import_select_none">Select none</string>
+    <string name="keep_import_archived">Archived</string>
+    <string name="keep_import_all_checked">All ticked</string>
+    <plurals name="keep_import_found">
+        <item quantity="one">%d note found. Tick the ones that should become tasks.</item>
+        <item quantity="other">%d notes found. Tick the ones that should become tasks.</item>
+    </plurals>
+    <plurals name="keep_import_skipped">
+        <item quantity="one">%d note left out: in the bin, empty or unreadable.</item>
+        <item quantity="other">%d notes left out: in the bin, empty or unreadable.</item>
+    </plurals>
+    <plurals name="keep_import_add">
+        <item quantity="one">Add %d task</item>
+        <item quantity="other">Add %d tasks</item>
+    </plurals>
+    <plurals name="keep_import_done">
+        <item quantity="one">%d task added from Keep.</item>
+        <item quantity="other">%d tasks added from Keep.</item>
+    </plurals>
 </resources>

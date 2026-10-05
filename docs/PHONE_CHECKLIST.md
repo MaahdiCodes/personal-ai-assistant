@@ -1,8 +1,9 @@
-# Phone check: Phases 0, 1 and 2
+# Phone check: Phases 0 to 3
 
 Do this on **each phone**. Sections 1–7 check Phases 0 + 1 (tasks and reminders): about 20
 minutes of hands-on time, plus some waiting for the long reminder tests (you can use the phone
-normally while you wait). Section 8 checks Phase 2 (reading messages).
+normally while you wait). Section 8 checks Phase 2 (reading messages), section 9 Phase 3
+(suggested tasks and the AI model).
 
 Run the scripts from the project folder in PowerShell. Add `-Phone pixel` or `-Phone poco` when
 both phones are connected.
@@ -208,4 +209,72 @@ check the parsers and find where WhatsApp names the account.
 | After restart / after 48 hours | | |
 | usage.ps1: services, memory while the listener runs | | |
 | Recordings made | | |
+| Problems seen | | |
+
+## 9. Phase 3: suggested tasks and the AI model
+
+Mavick now looks for tasks in the messages it reads, on the phone. Without a model, simple rules
+do it; with the AI model imported, the AI does. Nothing becomes a task until you tap **Add**.
+Still no internet: the model arrives as a file from the PC.
+
+### Without a model first
+
+- [ ] Install the Phase 3 build: `.\scripts\install.ps1 -Phone pixel`. Settings shows version 0.4.0.
+- [ ] Settings › Suggestions: **Suggest tasks from messages** is on, **AI model: None**.
+- [ ] From the other phone send `Can you pay the rent tomorrow at 10am?`. Within a minute the task
+      list shows **"Mavick found 1 possible task in your messages"** and a quiet "1 suggested task to
+      review" notification appears (no sound). The lock screen shows only "Mavick suggestions".
+- [ ] **Review**: the card says *Simple rules*, tomorrow · 10:00, and quotes the message.
+- [ ] **Add**: the task appears in Upcoming, with a reminder at 10:00; **Undo** takes it back.
+- [ ] Send `haha nice photo`: no suggestion (stopped by the prefilter).
+
+### The AI model
+
+- [ ] On the PC, download **gemma3-1b-it-int4.litertlm** (about 557 MB) from
+      https://huggingface.co/litert-community/Gemma3-1B-IT (sign in and accept the Gemma terms first).
+- [ ] `.\scripts\push-model.ps1 -Model <the file> -Phone pixel`: it ends with "The copy matches".
+- [ ] Settings › Suggestions › **Import model**, pick the file in Downloads. It copies (progress shown),
+      then checks itself: **"Imported. It works: a test message took … s."** Note the time.
+- [ ] Accept **Delete the downloaded copy** (Mavick keeps its own).
+- [ ] Send `Can you send me the signed form by Thursday 5pm?`. The suggestion appears without
+      *Simple rules*, with a short to-do title, Thursday · 17:00.
+- [ ] Send `Reminder: school fees must be paid by the end of the month`. If suggested, the card shows
+      the words and **Add…** opens the editor to pick a date.
+- [ ] Settings › Suggestions shows "Answers in about … s per message" and the counts.
+- [ ] Turn on Battery Saver, send a message with a task: no suggestion yet, and Settings says
+      "waiting: Battery Saver is on". Turn it off and open Mavick: the suggestion appears.
+- [ ] A suggestion's ⋮ › **Never read this chat**: the chat's messages and suggestions go.
+- [ ] The morning briefing (section 5) mentions suggestions waiting.
+
+### Google Keep (Takeout)
+
+- [ ] At takeout.google.com, export **Keep** only, as a .zip. Copy the .zip to the phone's Download
+      folder.
+- [ ] Settings › Google Keep › **Import notes from Google Takeout…**, pick the .zip. Your notes are
+      listed with none ticked; tick a few, **Add N tasks**. Notes in the bin don't appear.
+
+### Measurements (both phones)
+
+- [ ] `.\scripts\push-model.ps1 -Model <the file> -Phone pixel -ForTests`, then
+      `.\scripts\test.ps1 -OnPhone -Phone pixel`: the AI runtime tests pass.
+- [ ] `.\scripts\eval.ps1 -Phone pixel -Set eval\sample.csv`: it prints a report (made-up messages).
+- [ ] With a model loaded (right after a suggestion), `.\scripts\usage.ps1 -Phone pixel`: note the
+      memory. A minute later, run it again: the memory should drop back as the model is closed.
+- [ ] A normal day with the model: battery use for Mavick (Settings › Battery) and whether the phone
+      got warm.
+- [ ] The accuracy check on your own messages: [eval/README.md](../eval/README.md).
+
+### Results (Phase 3)
+
+| Item | Pixel 7 Pro | Poco X7 Pro |
+|---|---|---|
+| Rules suggestion, notification, Add / Undo | | |
+| Model import: time to copy, check result and time | | |
+| AI suggestion seconds (Settings) | | |
+| Battery Saver pause and resume | | |
+| Keep Takeout import | | |
+| On-phone AI tests pass | | |
+| Memory with the model loaded / a minute later | | |
+| Battery use over a day, warmth | | |
+| Accuracy check: precision / recall / seconds | | |
 | Problems seen | | |

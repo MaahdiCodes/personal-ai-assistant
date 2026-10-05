@@ -101,6 +101,7 @@ fun SettingsScreen(
     settings: AppSettings,
     health: HealthInfo,
     ai: AiSettingsState,
+    exportOutcome: ExportOutcome?,
     now: Instant,
     zone: ZoneId,
     use24Hour: Boolean,
@@ -116,6 +117,8 @@ fun SettingsScreen(
     onCheckModel: () -> Unit,
     onRemoveModel: () -> Unit,
     onTurnModelOnAgain: () -> Unit,
+    onExportMessages: () -> Unit,
+    onImportKeep: () -> Unit,
     onBack: () -> Unit,
 ) {
     var pickingBriefingTime by remember { mutableStateOf(false) }
@@ -204,6 +207,7 @@ fun SettingsScreen(
             SuggestionsSection(
                 settings = settings,
                 ai = ai,
+                exportOutcome = exportOutcome,
                 now = now,
                 zone = zone,
                 use24Hour = use24Hour,
@@ -212,7 +216,15 @@ fun SettingsScreen(
                 onCheckModel = onCheckModel,
                 onRemoveModel = onRemoveModel,
                 onTurnModelOnAgain = onTurnModelOnAgain,
+                onExportMessages = onExportMessages,
             )
+            HorizontalDivider()
+
+            Text(stringResource(R.string.settings_keep), style = MaterialTheme.typography.titleMedium)
+            Column(Modifier.fillMaxWidth().clickable(onClick = onImportKeep).padding(vertical = 4.dp)) {
+                Text(stringResource(R.string.settings_keep_import), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.settings_keep_import_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             HorizontalDivider()
 
             HealthSection(

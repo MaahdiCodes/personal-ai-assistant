@@ -14,6 +14,7 @@ import dev.maahdi.mavick.data.settings.SettingsRepository
 import dev.maahdi.mavick.ui.editor.EditorRoute
 import dev.maahdi.mavick.ui.inbox.InboxRoute
 import dev.maahdi.mavick.ui.inbox.MessageRoute
+import dev.maahdi.mavick.ui.keep.KeepImportRoute
 import dev.maahdi.mavick.ui.lock.LockScreen
 import dev.maahdi.mavick.ui.reading.ReadingRoute
 import dev.maahdi.mavick.ui.settings.SettingsRoute
@@ -52,7 +53,12 @@ fun MavickRoot(
             onOpenInbox = navigation::openInbox,
             onOpenSuggestions = navigation::openSuggestions,
         )
-        Destination.Settings -> SettingsRoute(container, onOpenReading = navigation::openReading, onBack = back)
+        Destination.Settings -> SettingsRoute(
+            container = container,
+            onOpenReading = navigation::openReading,
+            onOpenKeepImport = navigation::openKeepImport,
+            onBack = back,
+        )
         is Destination.Editor -> EditorRoute(container, destination, onClose = closeEditor)
         Destination.Inbox -> InboxRoute(container, onOpenMessage = navigation::openMessage, onOpenReading = navigation::openReading, onBack = back)
         is Destination.Message -> MessageRoute(container, destination.messageId, onAddTask = { navigation.openEditor(draft = it) }, onBack = back)
@@ -63,6 +69,7 @@ fun MavickRoot(
             onOpenSettings = navigation::openSettings,
             onBack = back,
         )
+        is Destination.KeepImport -> KeepImportRoute(container, destination.uri, onBack = back)
     }
 }
 
