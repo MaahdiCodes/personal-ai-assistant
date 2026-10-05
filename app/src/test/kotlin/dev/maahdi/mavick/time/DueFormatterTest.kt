@@ -9,13 +9,42 @@ import java.time.DayOfWeek
 import java.time.DayOfWeek.FRIDAY
 import java.time.DayOfWeek.MONDAY
 import java.time.DayOfWeek.THURSDAY
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Month
+import java.time.ZoneId
 import org.junit.Test
 
 class DueFormatterTest {
     private val today = LocalDate.of(2026, 10, 5) // a Monday
+
+    @Test
+    fun `a moment shows its day and time in the given time zone`() {
+        val dhaka = ZoneId.of("Asia/Dhaka")
+        val tenFive = Instant.parse("2026-10-05T04:05:00Z") // 10:05 in Dhaka
+
+        assertThat(DueFormatter.moment(tenFive, dhaka, today, use24Hour = true)).isEqualTo("Today · 10:05")
+        assertThat(DueFormatter.moment(tenFive.minus(Duration.ofDays(1)), dhaka, today, use24Hour = false)).isEqualTo("Yesterday · 10:05 AM")
+        // 22:30 UTC on the 4th is already the 5th in Dhaka.
+        assertThat(DueFormatter.moment(Instant.parse("2026-10-04T22:30:00Z"), dhaka, today, use24Hour = true)).isEqualTo("Today · 04:30")
+    }
+
+    @Test
+    fun `how long ago reads naturally`() {
+        val now = Instant.parse("2026-10-05T04:00:00Z")
+
+        assertThat(DueFormatter.ago(now, now)).isEqualTo("just now")
+        assertThat(DueFormatter.ago(now.minusSeconds(59), now)).isEqualTo("just now")
+        assertThat(DueFormatter.ago(now.minus(Duration.ofMinutes(5)), now)).isEqualTo("5 min ago")
+        assertThat(DueFormatter.ago(now.minus(Duration.ofMinutes(59)), now)).isEqualTo("59 min ago")
+        assertThat(DueFormatter.ago(now.minus(Duration.ofHours(3)), now)).isEqualTo("3 h ago")
+        assertThat(DueFormatter.ago(now.minus(Duration.ofHours(30)), now)).isEqualTo("1 day ago")
+        assertThat(DueFormatter.ago(now.minus(Duration.ofDays(4)), now)).isEqualTo("4 days ago")
+        // A clock set back (or a time zone change) never gives a negative age.
+        assertThat(DueFormatter.ago(now.plusSeconds(600), now)).isEqualTo("just now")
+    }
 
     @Test
     fun `days near today get friendly names`() {

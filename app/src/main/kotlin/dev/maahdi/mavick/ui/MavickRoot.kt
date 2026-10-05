@@ -12,7 +12,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.maahdi.mavick.AppContainer
 import dev.maahdi.mavick.data.settings.SettingsRepository
 import dev.maahdi.mavick.ui.editor.EditorRoute
+import dev.maahdi.mavick.ui.inbox.InboxRoute
+import dev.maahdi.mavick.ui.inbox.MessageRoute
 import dev.maahdi.mavick.ui.lock.LockScreen
+import dev.maahdi.mavick.ui.reading.ReadingRoute
 import dev.maahdi.mavick.ui.settings.SettingsRoute
 import dev.maahdi.mavick.ui.tasks.TasksRoute
 
@@ -38,15 +41,20 @@ fun MavickRoot(
             navigation.back()
         }
     }
+    val back: () -> Unit = { navigation.back() }
     when (val destination = navigation.current) {
         Destination.Tasks -> TasksRoute(
             container = container,
             onOpenTask = { navigation.openEditor(taskId = it) },
             onNewTask = { navigation.openEditor() },
             onOpenSettings = navigation::openSettings,
+            onOpenInbox = navigation::openInbox,
         )
-        Destination.Settings -> SettingsRoute(container, onBack = { navigation.back() })
+        Destination.Settings -> SettingsRoute(container, onOpenReading = navigation::openReading, onBack = back)
         is Destination.Editor -> EditorRoute(container, destination, onClose = closeEditor)
+        Destination.Inbox -> InboxRoute(container, onOpenMessage = navigation::openMessage, onOpenReading = navigation::openReading, onBack = back)
+        is Destination.Message -> MessageRoute(container, destination.messageId, onAddTask = { navigation.openEditor(draft = it) }, onBack = back)
+        Destination.Reading -> ReadingRoute(container, onBack = back)
     }
 }
 

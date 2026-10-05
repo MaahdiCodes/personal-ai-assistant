@@ -110,6 +110,128 @@
     <string name="briefing_title">Your day</string>
     <string name="briefing_public_title">Mavick: your day</string>
     <string name="briefing_overdue_line">Overdue: %1$s</string>
+    <string name="channel_health">Health warnings</string>
+    <string name="channel_health_description">When Mavick stops reading messages</string>
+    <string name="reading_warning_title">Mavick isn\'t reading messages</string>
+    <string name="reading_warning_stopped">Android stopped Mavick\'s notification reading. Open Mavick to restart it.</string>
+    <string name="reading_warning_quiet">No WhatsApp, Messenger or Gmail message has arrived for a while. Tap to check that reading still works.</string>
+
+    <!-- Message reading (Phase 2) -->
+    <string name="listener_label">Mavick message reading</string>
+    <string name="process_text_label">Add to Mavick</string>
+    <string name="app_whatsapp">WhatsApp</string>
+    <string name="app_whatsapp_business">WhatsApp Business</string>
+    <string name="app_messenger">Messenger</string>
+    <string name="app_gmail">Gmail</string>
+    <string name="app_keep">Keep reminders</string>
+    <string name="account_main">Main</string>
+    <string name="account_clone">Clone (user %1$d)</string>
+
+    <!-- Inbox -->
+    <string name="open_inbox">Messages</string>
+    <string name="inbox_title">Messages</string>
+    <string name="inbox_empty">No messages yet. New WhatsApp, Messenger and Gmail messages, and Keep reminders, appear here.</string>
+    <string name="access_off">Mavick can\'t read notifications yet.</string>
+    <string name="access_restricted_hint">If Android says \"Restricted setting\": App info › ⋮ › Allow restricted settings, then try again.</string>
+    <string name="more_options">More options</string>
+    <string name="resume_reading">Resume reading</string>
+    <string name="paused_until">Reading is paused until %1$s.</string>
+    <string name="paused_until_resumed">Reading is paused until you resume it.</string>
+    <string name="pause_one_hour">Pause for 1 hour</string>
+    <string name="pause_until_morning">Pause until 6:00 tomorrow</string>
+    <string name="pause_until_resumed">Pause until I resume</string>
+    <string name="cut_short">Cut short</string>
+    <string name="message_from_you">You: %1$s</string>
+    <string name="message_from">%1$s: %2$s</string>
+
+    <!-- One message -->
+    <string name="message_missing">This message is no longer saved.</string>
+    <string name="message_you_at">You · %1$s</string>
+    <string name="message_from_at">From %1$s · %2$s</string>
+    <string name="gmail_preview_note">Gmail shows only a preview of each email. Open Gmail for all of it.</string>
+    <string name="cut_short_note">Android cut this message short. Open %1$s for the rest.</string>
+    <string name="add_as_task">Add as task</string>
+    <string name="never_read_chat">Never read this chat</string>
+    <string name="never_read_confirm_title">Stop reading %1$s?</string>
+    <plurals name="never_read_confirm_text">
+        <item quantity="one">Mavick will skip new messages from this chat and delete its %d saved message.</item>
+        <item quantity="other">Mavick will skip new messages from this chat and delete its %d saved messages.</item>
+    </plurals>
+    <string name="never_read_confirm">Stop reading</string>
+    <string name="origin_you">You wrote in %1$s (%2$s)</string>
+    <string name="origin_app">From %1$s</string>
+    <string name="origin_group">From %1$s in %2$s (%3$s)</string>
+    <string name="origin_person">From %1$s (%2$s)</string>
+
+    <!-- What Mavick reads -->
+    <string name="reading_title">What Mavick reads</string>
+    <string name="reading_status_on">Mavick is reading messages.</string>
+    <string name="pause_button">Pause…</string>
+    <string name="section_apps">Apps</string>
+    <string name="capture_all_chats">All chats</string>
+    <string name="capture_only_listed">Only listed chats</string>
+    <string name="section_never_read">Never read</string>
+    <string name="section_never_read_summary">Matching messages are dropped before anything is saved.</string>
+    <string name="section_only_read">Only read</string>
+    <string name="section_only_read_summary">Apps set to \"Only listed chats\" read only these.</string>
+    <string name="only_read_empty_warning">Nothing is read from %1$s until you add a chat or person here.</string>
+    <string name="add_word">+ Word</string>
+    <string name="add_chat">+ Chat</string>
+    <string name="add_person">+ Person</string>
+    <string name="add_account">+ Account</string>
+    <string name="rule_keyword">Word: %1$s</string>
+    <string name="rule_chat">Chat: %1$s</string>
+    <string name="rule_sender">Person: %1$s</string>
+    <string name="rule_account">Account: %1$s</string>
+    <string name="rule_all_apps">All apps</string>
+    <string name="rule_last_matched">last matched %1$s</string>
+    <string name="rule_never_matched">not matched yet</string>
+    <string name="delete_rule">Delete %1$s</string>
+    <string name="add_title_keyword">Never read messages with a word</string>
+    <string name="add_title_chat_never">Never read a chat</string>
+    <string name="add_title_person_never">Never read a person</string>
+    <string name="add_title_account">Never read an account</string>
+    <string name="add_title_chat_only">Only read a chat</string>
+    <string name="add_title_person_only">Only read a person</string>
+    <string name="field_keyword">Word or phrase</string>
+    <string name="field_chat">Chat or group name</string>
+    <string name="field_person">Person\'s name</string>
+    <string name="typed_applies_everywhere">A typed name applies to every app and account. Or pick one below:</string>
+    <string name="suggestions_none">Names to pick from appear here once messages have been read.</string>
+    <string name="dialog_add">Add</string>
+
+    <!-- Settings: messages and health -->
+    <string name="settings_messages">Messages</string>
+    <string name="settings_reading_summary">Apps, chats, people and words to skip</string>
+    <string name="settings_retention">Keep messages for</string>
+    <string name="settings_warning">Warn if no messages arrive for</string>
+    <string name="warning_never">Never warn</string>
+    <plurals name="days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string name="settings_delete_messages">Delete all saved messages</string>
+    <string name="delete_messages_confirm_title">Delete all saved messages?</string>
+    <string name="delete_messages_confirm_text">Tasks you made from messages are kept.</string>
+    <string name="delete_messages_confirm">Delete</string>
+    <string name="status_access">Notification access</string>
+    <string name="status_access_off">Off: Mavick can\'t read messages</string>
+    <string name="status_reading">Message reading</string>
+    <string name="reading_off">Off</string>
+    <string name="reading_not_connected">Stopped by Android</string>
+    <string name="reading_quiet">Nothing received since %1$s</string>
+    <string name="reading_quiet_never">Nothing received for a while</string>
+    <string name="reading_ok_last">Working · last message %1$s</string>
+    <string name="reading_ok_nothing">Working · nothing received yet</string>
+    <plurals name="reading_disconnects">
+        <item quantity="one">Android stopped it %d time in the last 7 days</item>
+        <item quantity="other">Android stopped it %d times in the last 7 days</item>
+    </plurals>
+    <string name="status_restart">Restart</string>
+    <string name="status_autostart">Autostart (Xiaomi)</string>
+    <string name="status_autostart_summary">Xiaomi stops apps without it. Android can\'t check it, so tick this once it\'s on.</string>
+    <string name="status_open">Open</string>
+    <string name="status_background_reading">Alarms, and reading notifications as they arrive</string>
     <plurals name="briefing_due_today">
         <item quantity="one">%d task due today</item>
         <item quantity="other">%d tasks due today</item>

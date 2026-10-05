@@ -11,6 +11,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import dev.maahdi.mavick.data.task.TaskPriority
 import dev.maahdi.mavick.data.task.TaskStatus
+import dev.maahdi.mavick.time.RepeatRule
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -71,6 +72,37 @@ class MigrationTest {
         assertThat(task.reminderTime).isNull()
         assertThat(task.repeatRule).isNull()
         assertThat(task.completedAt).isNull()
+    }
+
+    @Test
+    fun `Phase 1 tasks survive the upgrade to version 3, which adds empty message tables`() {
+        helper.createDatabase(2).apply {
+            execSQL(
+                """
+                INSERT INTO task (id, title, notes, dueDate, dueTime, remindAt, priority, status, source,
+                                  sourceExcerpt, createdAt, updatedAt, deletedAt, reminderTime, repeatRule, completedAt)
+                VALUES ('t2', 'Pay rent', NULL, '2026-11-01', '10:00', '2026-11-01T10:00', 'NORMAL',
+                        'OPEN', 'MANUAL', NULL, 1000, 2000, NULL, '10:00', 'MONTHLY:1', NULL)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(3).close()
+
+        val database = Room.databaseBuilder(context, MavickDatabase::class.java, databaseFile.absolutePath)
+            .allowMainThreadQueries()
+            .build()
+        val task = runBlocking { database.taskDao().findById("t2") }!!
+        val messageCount = runBlocking { database.messageDao().count() }
+        val rules = runBlocking { database.exclusionRuleDao().getAll() }
+        database.close()
+
+        assertThat(task.title).isEqualTo("Pay rent")
+        assertThat(task.reminderTime).isEqualTo(LocalTime.of(10, 0))
+        assertThat(task.repeatRule).isEqualTo(RepeatRule.Monthly(1))
+        assertThat(messageCount).isEqualTo(0)
+        assertThat(rules).isEmpty()
     }
 
     private companion object {

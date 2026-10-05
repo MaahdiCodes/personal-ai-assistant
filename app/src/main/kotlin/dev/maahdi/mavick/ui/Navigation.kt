@@ -14,10 +14,18 @@ sealed interface Destination {
 
     /** [sessionId] gives each opened editor its own state, even for the same task. */
     data class Editor(val sessionId: Long, val taskId: String? = null, val draft: TaskDraft? = null) : Destination
+
+    /** Messages read from notifications (Phase 2). */
+    data object Inbox : Destination
+
+    data class Message(val messageId: String) : Destination
+
+    /** What Mavick reads: app switches, "Never read" and "Only read" rules, the pause. */
+    data object Reading : Destination
 }
 
 /**
- * Which screen is showing. A plain back stack, no navigation library: three screens don't need one.
+ * Which screen is showing. A plain back stack, no navigation library: a few screens don't need one.
  * Kept in a ViewModel so it survives screen rotation.
  */
 class NavigationViewModel : ViewModel() {
@@ -32,9 +40,13 @@ class NavigationViewModel : ViewModel() {
 
     val canGoBack: Boolean get() = backStack.size > 1
 
-    fun openSettings() {
-        backStack.add(Destination.Settings)
-    }
+    fun openSettings() = push(Destination.Settings)
+
+    fun openInbox() = push(Destination.Inbox)
+
+    fun openMessage(messageId: String) = push(Destination.Message(messageId))
+
+    fun openReading() = push(Destination.Reading)
 
     /** Opens an editor; an editor already open is replaced, so only one exists at a time. */
     fun openEditor(taskId: String? = null, draft: TaskDraft? = null, fromShare: Boolean = false) {
@@ -48,5 +60,10 @@ class NavigationViewModel : ViewModel() {
         if (!canGoBack) return false
         backStack.removeAt(backStack.lastIndex)
         return true
+    }
+
+    /** Opens [destination]; the same screen already on top isn't opened twice. */
+    private fun push(destination: Destination) {
+        if (current != destination) backStack.add(destination)
     }
 }

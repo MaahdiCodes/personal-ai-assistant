@@ -12,6 +12,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.maahdi.mavick.data.task.TaskDraft
+import dev.maahdi.mavick.reminders.ReminderIntents
 import dev.maahdi.mavick.ui.Destination
 import dev.maahdi.mavick.ui.NavigationViewModel
 import java.time.LocalTime
@@ -41,6 +42,7 @@ class ShareIntoMavickTest {
             scenario.onActivity { activity ->
                 val navigation = ViewModelProvider(activity)[NavigationViewModel::class.java]
                 destination = navigation.current
+                // An editor opened from another app returns to that app when closed.
                 assertThat(navigation.finishAfterEditor).isEqualTo(navigation.current is Destination.Editor)
             }
         }
@@ -86,5 +88,30 @@ class ShareIntoMavickTest {
     @Test
     fun `a share that is not text is ignored`() {
         assertThat(destinationAfter(shareIntent(text = "Pay rent", type = "image/png"))).isEqualTo(Destination.Tasks)
+    }
+
+    private fun selectedTextIntent(text: CharSequence?) =
+        Intent(context, MainActivity::class.java).setAction(Intent.ACTION_PROCESS_TEXT).setType("text/plain").apply {
+            text?.let { putExtra(Intent.EXTRA_PROCESS_TEXT, it) }
+        }
+
+    @Test
+    fun `selected text with Add to Mavick opens the editor pre-filled`() {
+        val draft = draftAfter(selectedTextIntent(styled("Renew the passport by 12/11\nTake two photos")))
+
+        assertThat(draft.title).isEqualTo("Renew the passport")
+        assertThat(draft.notes).isEqualTo("Take two photos")
+    }
+
+    @Test
+    fun `Add to Mavick with nothing selected opens the task list`() {
+        assertThat(destinationAfter(selectedTextIntent(text = null))).isEqualTo(Destination.Tasks)
+    }
+
+    @Test
+    fun `a reading warning opens Settings`() {
+        val intent = Intent(context, MainActivity::class.java).setAction(ReminderIntents.ACTION_OPEN_SETTINGS)
+
+        assertThat(destinationAfter(intent)).isEqualTo(Destination.Settings)
     }
 }

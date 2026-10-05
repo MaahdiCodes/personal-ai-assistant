@@ -2,9 +2,14 @@ package dev.maahdi.mavick.data.settings
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import dev.maahdi.mavick.capture.AppCapture
+import dev.maahdi.mavick.capture.CaptureMode
+import dev.maahdi.mavick.capture.CapturePause
+import dev.maahdi.mavick.capture.SourceApp
 import dev.maahdi.mavick.time.DEFAULT_WORK_DAYS
 import dev.maahdi.mavick.time.DateOrder
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +23,27 @@ data class AppSettings(
     val dateOrder: DateOrder = DateOrder.DAY_MONTH,
     /** Whether Mavick already asked for notification permission once (Android asks only so often). */
     val notificationPermissionRequested: Boolean = false,
-)
+    /** Which apps are read, and which of their chats (Phase 2). */
+    val appCapture: Map<SourceApp, AppCapture> = SourceApp.entries.associateWith { AppCapture() },
+    val capturePause: CapturePause = CapturePause.Off,
+    /** Saved messages are deleted after this many days. */
+    val messageRetentionDays: Int = DEFAULT_RETENTION_DAYS,
+    /** Warn when no message has been read for this many days; 0 means never. */
+    val readingWarningDays: Int = DEFAULT_WARNING_DAYS,
+    /** Xiaomi only: the user confirmed Autostart is on (Android can't check it). */
+    val xiaomiAutostartOn: Boolean = false,
+    /** The default "Never read" keywords were added once; deleting one keeps it deleted. */
+    val defaultRulesAdded: Boolean = false,
+) {
+    fun captureFor(app: SourceApp): AppCapture = appCapture[app] ?: AppCapture()
+
+    companion object {
+        const val DEFAULT_RETENTION_DAYS = 14
+        val RETENTION_DAYS_RANGE = 1..90
+        const val DEFAULT_WARNING_DAYS = 1
+        val WARNING_DAYS_RANGE = 0..7
+    }
+}
 
 /**
  * Settings, kept in a small private preferences file (never backed up, see
@@ -33,8 +58,12 @@ class SettingsRepository(private val preferences: SharedPreferences) {
 
     @Synchronized
     fun update(transform: (AppSettings) -> AppSettings) {
-        val updated = transform(state.value)
-        if (updated.workDays.isEmpty()) return // at least one work day is needed
+        val transformed = transform(state.value)
+        if (transformed.workDays.isEmpty()) return // at least one work day is needed
+        val updated = transformed.copy(
+            messageRetentionDays = transformed.messageRetentionDays.coerceIn(AppSettings.RETENTION_DAYS_RANGE),
+            readingWarningDays = transformed.readingWarningDays.coerceIn(AppSettings.WARNING_DAYS_RANGE),
+        )
         write(updated)
         state.value = updated
     }
@@ -54,6 +83,16 @@ class SettingsRepository(private val preferences: SharedPreferences) {
                 ?.let { name -> DateOrder.entries.firstOrNull { it.name == name } }
                 ?: defaults.dateOrder,
             notificationPermissionRequested = preferences.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false),
+            appCapture = SourceApp.entries.associateWith(::readAppCapture),
+            capturePause = readPause(),
+            messageRetentionDays = preferences.getInt(KEY_RETENTION_DAYS, AppSettings.DEFAULT_RETENTION_DAYS)
+                .takeIf { it in AppSettings.RETENTION_DAYS_RANGE }
+                ?: AppSettings.DEFAULT_RETENTION_DAYS,
+            readingWarningDays = preferences.getInt(KEY_WARNING_DAYS, AppSettings.DEFAULT_WARNING_DAYS)
+                .takeIf { it in AppSettings.WARNING_DAYS_RANGE }
+                ?: AppSettings.DEFAULT_WARNING_DAYS,
+            xiaomiAutostartOn = preferences.getBoolean(KEY_XIAOMI_AUTOSTART, false),
+            defaultRulesAdded = preferences.getBoolean(KEY_DEFAULT_RULES_ADDED, false),
         )
     }
 
@@ -65,6 +104,20 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             putString(KEY_WORK_DAYS, settings.workDays.sorted().joinToString(",") { it.name })
             putString(KEY_DATE_ORDER, settings.dateOrder.name)
             putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, settings.notificationPermissionRequested)
+            SourceApp.entries.forEach { app ->
+                val capture = settings.captureFor(app)
+                putBoolean(appEnabledKey(app), capture.enabled)
+                putString(appModeKey(app), capture.mode.name)
+            }
+            when (val pause = settings.capturePause) {
+                CapturePause.Off -> remove(KEY_PAUSE)
+                CapturePause.UntilResumed -> putString(KEY_PAUSE, PAUSE_UNTIL_RESUMED)
+                is CapturePause.Until -> putString(KEY_PAUSE, pause.until.toEpochMilli().toString())
+            }
+            putInt(KEY_RETENTION_DAYS, settings.messageRetentionDays)
+            putInt(KEY_WARNING_DAYS, settings.readingWarningDays)
+            putBoolean(KEY_XIAOMI_AUTOSTART, settings.xiaomiAutostartOn)
+            putBoolean(KEY_DEFAULT_RULES_ADDED, settings.defaultRulesAdded)
         }
     }
 
@@ -72,6 +125,27 @@ class SettingsRepository(private val preferences: SharedPreferences) {
         val days = text.split(',').map { name -> DayOfWeek.entries.firstOrNull { it.name == name } }
         return if (days.isEmpty() || days.any { it == null }) null else days.filterNotNull().toSet()
     }
+
+    private fun readAppCapture(app: SourceApp): AppCapture {
+        val defaults = AppCapture()
+        return AppCapture(
+            enabled = preferences.getBoolean(appEnabledKey(app), defaults.enabled),
+            mode = preferences.getString(appModeKey(app), null)
+                ?.let { name -> CaptureMode.entries.firstOrNull { it.name == name } }
+                ?: defaults.mode,
+        )
+    }
+
+    /** A damaged pause stays paused: for privacy, reading must not restart by accident. */
+    private fun readPause(): CapturePause {
+        val stored = preferences.getString(KEY_PAUSE, null) ?: return CapturePause.Off
+        if (stored == PAUSE_UNTIL_RESUMED) return CapturePause.UntilResumed
+        return stored.toLongOrNull()?.let { CapturePause.Until(Instant.ofEpochMilli(it)) } ?: CapturePause.UntilResumed
+    }
+
+    private fun appEnabledKey(app: SourceApp) = "capture_${app.name}_enabled"
+
+    private fun appModeKey(app: SourceApp) = "capture_${app.name}_mode"
 
     companion object {
         const val FILE_NAME = "settings"
@@ -81,5 +155,11 @@ class SettingsRepository(private val preferences: SharedPreferences) {
         private const val KEY_WORK_DAYS = "work_days"
         private const val KEY_DATE_ORDER = "date_order"
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
+        private const val KEY_PAUSE = "capture_pause"
+        private const val PAUSE_UNTIL_RESUMED = "until-resumed"
+        private const val KEY_RETENTION_DAYS = "message_retention_days"
+        private const val KEY_WARNING_DAYS = "reading_warning_days"
+        private const val KEY_XIAOMI_AUTOSTART = "xiaomi_autostart_on"
+        private const val KEY_DEFAULT_RULES_ADDED = "default_rules_added"
     }
 }

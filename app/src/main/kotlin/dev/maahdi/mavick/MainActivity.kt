@@ -4,6 +4,7 @@ import android.content.Intent
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Bundle
 import android.os.CancellationSignal
+import android.service.notification.NotificationListenerService
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -54,6 +55,9 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         container.appLock.onScreenShown(canAuthenticate(this))
+        // If Android dropped message reading (HyperOS does), ask it to connect again. Does nothing
+        // when reading is already connected or access isn't granted.
+        if (container.hasNotificationAccess()) NotificationListenerService.requestRebind(container.listenerComponent)
         // Restores alarms if Android force-stopped Mavick, once per process, off the main thread.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -75,18 +79,27 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_SEND -> openSharedText(intent)
+            Intent.ACTION_SEND -> if (intent.type?.startsWith("text/") == true) {
+                // Read as CharSequence: some apps share styled text, which getStringExtra would drop.
+                openTextAsTask(
+                    subject = intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString(),
+                    text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString(),
+                )
+            }
+            Intent.ACTION_PROCESS_TEXT -> openTextAsTask(subject = null, text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString())
             ReminderIntents.ACTION_OPEN_TASK -> ReminderIntents.taskIdOf(intent)?.let { navigation.openEditor(taskId = it) }
+            ReminderIntents.ACTION_OPEN_SETTINGS -> navigation.openSettings()
         }
     }
 
-    /** Text shared from another app (for example Google Keep: ⋮ > Send > Mavick) opens as a new task. */
-    private fun openSharedText(intent: Intent) {
-        if (intent.type?.startsWith("text/") != true) return
-        // Read as CharSequence: some apps share styled text, which getStringExtra would drop.
+    /**
+     * Text from another app opens as a new task: shared (for example Google Keep: ⋮ > Send >
+     * Mavick), or selected and then "Add to Mavick" picked from the selection menu.
+     */
+    private fun openTextAsTask(subject: String?, text: String?) {
         val draft = SharedText.toDraft(
-            subject = intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString(),
-            text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString(),
+            subject = subject,
+            text = text,
             fromPackage = referrer?.host,
             parser = container.whenParser(),
             now = LocalDateTime.now(container.clock()),

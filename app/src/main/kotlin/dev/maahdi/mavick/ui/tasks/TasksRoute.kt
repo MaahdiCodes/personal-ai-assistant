@@ -26,6 +26,7 @@ fun TasksRoute(
     onOpenTask: (String) -> Unit,
     onNewTask: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenInbox: () -> Unit,
 ) {
     val viewModel: TasksViewModel = viewModel(factory = TasksViewModel.factory(container))
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -56,6 +57,7 @@ fun TasksRoute(
         onOpenTask = { onOpenTask(it.id) },
         onNewTask = onNewTask,
         onOpenSettings = onOpenSettings,
+        onOpenInbox = onOpenInbox,
         notificationsBlocked = notificationsBlocked,
         onFixNotifications = { PhoneSettings.open(context, PhoneSettings.notifications(context)) },
         snackbarHostState = snackbarHostState,

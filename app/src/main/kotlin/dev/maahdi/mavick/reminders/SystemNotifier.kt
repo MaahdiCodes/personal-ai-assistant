@@ -10,6 +10,7 @@ import android.graphics.drawable.Icon
 import android.text.format.DateFormat
 import dev.maahdi.mavick.MainActivity
 import dev.maahdi.mavick.R
+import dev.maahdi.mavick.capture.ReadingState
 import dev.maahdi.mavick.data.task.Briefing
 import dev.maahdi.mavick.data.task.TaskEntity
 import dev.maahdi.mavick.time.DueFormatter
@@ -17,7 +18,7 @@ import java.time.Clock
 import java.time.LocalDate
 
 /**
- * Android notifications for reminders and the morning briefing.
+ * Android notifications for reminders, the morning briefing and reading warnings.
  *
  * Privacy: on the lock screen only "Mavick reminder" shows; task titles appear once the phone is
  * unlocked. The buttons also need the phone unlocked before they act.
@@ -41,8 +42,40 @@ class SystemNotifier(
                     context.getString(R.string.channel_briefing),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply { description = context.getString(R.string.channel_briefing_description) },
+                NotificationChannel(
+                    CHANNEL_HEALTH,
+                    context.getString(R.string.channel_health),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply { description = context.getString(R.string.channel_health_description) },
             ),
         )
+    }
+
+    /** Message reading stopped or went quiet. Tapping opens Settings, where Health is. */
+    fun showReadingWarning(state: ReadingState) {
+        createChannels()
+        val text = when (state) {
+            ReadingState.QUIET -> R.string.reading_warning_quiet
+            else -> R.string.reading_warning_stopped
+        }
+        val notification = Notification.Builder(context, CHANNEL_HEALTH)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.reading_warning_title))
+            .setContentText(context.getString(text))
+            .setStyle(Notification.BigTextStyle().bigText(context.getString(text)))
+            .setAutoCancel(true)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    context,
+                    0,
+                    Intent(context, MainActivity::class.java)
+                        .setAction(ReminderIntents.ACTION_OPEN_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            .build()
+        manager.notify(HEALTH_TAG, HEALTH_NOTIFICATION_ID, notification)
     }
 
     override fun showReminder(task: TaskEntity, missed: Boolean) {
@@ -141,9 +174,12 @@ class SystemNotifier(
     companion object {
         const val CHANNEL_REMINDERS = "reminders"
         const val CHANNEL_BRIEFING = "briefing"
+        const val CHANNEL_HEALTH = "health"
         const val REMINDER_NOTIFICATION_ID = 1
         const val BRIEFING_NOTIFICATION_ID = 2
+        const val HEALTH_NOTIFICATION_ID = 3
         const val BRIEFING_TAG = "briefing"
+        const val HEALTH_TAG = "health"
         private const val MAX_BRIEFING_LINES = 6
     }
 }

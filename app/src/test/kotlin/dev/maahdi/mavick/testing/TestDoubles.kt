@@ -2,6 +2,7 @@ package dev.maahdi.mavick.testing
 
 import dev.maahdi.mavick.data.task.Briefing
 import dev.maahdi.mavick.data.task.TaskEntity
+import dev.maahdi.mavick.reminders.DailyChores
 import dev.maahdi.mavick.reminders.Notifier
 import dev.maahdi.mavick.reminders.ReminderScheduler
 import java.time.Clock
@@ -38,7 +39,7 @@ class MutableClock(private var now: Instant, private val zone: ZoneId = TEST_ZON
 /** Records alarms instead of setting real ones. */
 class FakeReminderScheduler : ReminderScheduler {
     val alarms = mutableMapOf<String, LocalDateTime>()
-    var briefingAt: LocalDateTime? = null
+    var dailyAt: LocalDateTime? = null
         private set
 
     override fun schedule(taskId: String, at: LocalDateTime) {
@@ -49,12 +50,25 @@ class FakeReminderScheduler : ReminderScheduler {
         alarms.remove(taskId)
     }
 
-    override fun scheduleBriefing(at: LocalDateTime) {
-        briefingAt = at
+    override fun scheduleDaily(at: LocalDateTime) {
+        dailyAt = at
+    }
+}
+
+/** Counts the daily chores instead of doing them; [failCleanUp] makes the clean-up throw. */
+class FakeDailyChores(private val failCleanUp: Boolean = false) : DailyChores {
+    var cleanUps = 0
+        private set
+    var dailies = 0
+        private set
+
+    override suspend fun cleanUp() {
+        cleanUps++
+        if (failCleanUp) throw IllegalStateException("clean-up failed")
     }
 
-    override fun cancelBriefing() {
-        briefingAt = null
+    override suspend fun daily() {
+        dailies++
     }
 }
 

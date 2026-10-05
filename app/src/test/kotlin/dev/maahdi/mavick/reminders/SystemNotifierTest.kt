@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import dev.maahdi.mavick.capture.ReadingState
 import dev.maahdi.mavick.data.task.Briefing
 import dev.maahdi.mavick.testing.MONDAY_10AM
 import dev.maahdi.mavick.testing.MutableClock
@@ -89,5 +90,26 @@ class SystemNotifierTest {
         notifier.createChannels()
 
         assertThat(manager.getNotificationChannel(SystemNotifier.CHANNEL_REMINDERS).importance).isEqualTo(NotificationManager.IMPORTANCE_HIGH)
+    }
+
+    @Test
+    fun `a reading warning says what is wrong and opens Settings, with no message content`() {
+        notifier.showReadingWarning(ReadingState.NOT_CONNECTED)
+
+        val notification = posted(SystemNotifier.HEALTH_TAG, SystemNotifier.HEALTH_NOTIFICATION_ID)!!
+        assertThat(notification.channelId).isEqualTo(SystemNotifier.CHANNEL_HEALTH)
+        assertThat(notification.text(Notification.EXTRA_TITLE)).isEqualTo("Mavick isn't reading messages")
+        assertThat(notification.text(Notification.EXTRA_TEXT)).contains("Open Mavick to restart it")
+        assertThat(shadowOf(notification.contentIntent).savedIntent.action).isEqualTo(ReminderIntents.ACTION_OPEN_SETTINGS)
+    }
+
+    @Test
+    fun `a quiet warning replaces an earlier warning instead of piling up`() {
+        notifier.showReadingWarning(ReadingState.NOT_CONNECTED)
+        notifier.showReadingWarning(ReadingState.QUIET)
+
+        assertThat(shadowOf(manager).allNotifications).hasSize(1)
+        assertThat(posted(SystemNotifier.HEALTH_TAG, SystemNotifier.HEALTH_NOTIFICATION_ID)!!.text(Notification.EXTRA_TEXT))
+            .contains("No WhatsApp, Messenger or Gmail message")
     }
 }

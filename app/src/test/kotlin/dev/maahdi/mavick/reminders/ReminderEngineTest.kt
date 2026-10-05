@@ -10,6 +10,7 @@ import dev.maahdi.mavick.data.settings.SettingsRepository
 import dev.maahdi.mavick.data.task.TaskDraft
 import dev.maahdi.mavick.data.task.TaskRepository
 import dev.maahdi.mavick.data.task.TaskStatus
+import dev.maahdi.mavick.testing.FakeDailyChores
 import dev.maahdi.mavick.testing.FakeNotifier
 import dev.maahdi.mavick.testing.FakeReminderScheduler
 import dev.maahdi.mavick.testing.MONDAY_10AM
@@ -28,6 +29,7 @@ class ReminderEngineTest {
     private val scheduler = FakeReminderScheduler()
     private val notifier = FakeNotifier()
     private val clock = MutableClock(MONDAY_10AM)
+    private val chores = FakeDailyChores()
     private lateinit var settings: SettingsRepository
     private lateinit var tasks: TaskRepository
     private lateinit var engine: ReminderEngine
@@ -39,7 +41,7 @@ class ReminderEngineTest {
         database = Room.inMemoryDatabaseBuilder(context, MavickDatabase::class.java).allowMainThreadQueries().build()
         settings = SettingsRepository(context.getSharedPreferences("engine-test", Context.MODE_PRIVATE))
         tasks = TaskRepository(database.taskDao(), scheduler, clock = { clock })
-        engine = ReminderEngine(tasks, notifier, scheduler, settings, clock = { clock })
+        engine = ReminderEngine(tasks, notifier, scheduler, settings, clock = { clock }, chores = chores)
     }
 
     @After
@@ -109,7 +111,7 @@ class ReminderEngineTest {
         engine.resync()
 
         assertThat(notifier.reminders).containsExactly(FakeNotifier.Shown(missed.id, "missed", missed = true))
-        assertThat(scheduler.briefingAt).isEqualTo(today.plusDays(1).atTime(8, 0))
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(8, 0))
     }
 
     @Test
@@ -127,28 +129,68 @@ class ReminderEngineTest {
     fun `the briefing is set for today when its time is still ahead`() {
         clock.setLocal(today.atTime(7, 0))
 
-        engine.scheduleBriefing()
+        engine.scheduleDailyAlarm()
 
-        assertThat(scheduler.briefingAt).isEqualTo(today.atTime(8, 0))
+        assertThat(scheduler.dailyAt).isEqualTo(today.atTime(8, 0))
     }
 
     @Test
     fun `the briefing follows the chosen time`() {
         settings.update { it.copy(briefingTime = LocalTime.of(6, 30)) }
 
-        engine.scheduleBriefing()
+        engine.scheduleDailyAlarm()
 
-        assertThat(scheduler.briefingAt).isEqualTo(today.plusDays(1).atTime(6, 30))
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(6, 30))
     }
 
     @Test
-    fun `turning the briefing off cancels it`() {
-        engine.scheduleBriefing()
+    fun `turning the briefing off keeps the daily alarm, which also cleans up`() {
         settings.update { it.copy(briefingEnabled = false) }
 
-        engine.scheduleBriefing()
+        engine.scheduleDailyAlarm()
 
-        assertThat(scheduler.briefingAt).isNull()
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(8, 0))
+    }
+
+    @Test
+    fun `with the briefing off, the daily alarm shows nothing but still does the chores`() = runTest {
+        settings.update { it.copy(briefingEnabled = false) }
+        tasks.create(TaskDraft(title = "Pay rent", dueDate = today))
+        clock.setLocal(today.atTime(8, 0))
+
+        engine.onDailyAlarm()
+
+        assertThat(notifier.briefings).isEmpty()
+        assertThat(chores.cleanUps).isEqualTo(1)
+        assertThat(chores.dailies).isEqualTo(1)
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(8, 0))
+    }
+
+    @Test
+    fun `a daily alarm that fires a moment early still sets tomorrow's, not another for today`() = runTest {
+        clock.setLocal(today.atTime(7, 59, 59))
+
+        engine.onDailyAlarm()
+
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(8, 0))
+    }
+
+    @Test
+    fun `a failing chore can't stop tomorrow's daily alarm`() = runTest {
+        val failing = ReminderEngine(tasks, notifier, scheduler, settings, clock = { clock }, chores = FakeDailyChores(failCleanUp = true))
+        clock.setLocal(today.atTime(8, 0))
+
+        runCatching { failing.onDailyAlarm() }
+
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(8, 0))
+    }
+
+    @Test
+    fun `resync cleans up, but leaves the daily warnings to the daily alarm`() = runTest {
+        engine.resync()
+
+        assertThat(chores.cleanUps).isEqualTo(1)
+        assertThat(chores.dailies).isEqualTo(0)
     }
 
     @Test
@@ -156,21 +198,21 @@ class ReminderEngineTest {
         tasks.create(TaskDraft(title = "Pay rent", dueDate = today))
         clock.setLocal(today.atTime(8, 0))
 
-        engine.onBriefingAlarm()
+        engine.onDailyAlarm()
 
         assertThat(notifier.briefings).hasSize(1)
         assertThat(notifier.briefings.single().today.map { it.title }).containsExactly("Pay rent")
-        assertThat(scheduler.briefingAt).isEqualTo(today.plusDays(1).atTime(8, 0))
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(8, 0))
     }
 
     @Test
     fun `a quiet day gets no briefing, but the next one is still set`() = runTest {
         clock.setLocal(today.atTime(8, 0))
 
-        engine.onBriefingAlarm()
+        engine.onDailyAlarm()
 
         assertThat(notifier.briefings).isEmpty()
-        assertThat(scheduler.briefingAt).isEqualTo(today.plusDays(1).atTime(8, 0))
+        assertThat(scheduler.dailyAt).isEqualTo(today.plusDays(1).atTime(8, 0))
     }
 
     @Test
@@ -179,7 +221,7 @@ class ReminderEngineTest {
         tasks.create(TaskDraft(title = "Weekend errand", dueDate = saturday))
         clock.setLocal(saturday.atTime(8, 0))
 
-        engine.onBriefingAlarm()
+        engine.onDailyAlarm()
 
         assertThat(notifier.briefings).hasSize(1)
     }

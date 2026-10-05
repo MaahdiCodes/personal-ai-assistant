@@ -9,8 +9,8 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 /**
- * Uses Android's AlarmManager: one alarm per pending reminder plus one for the morning briefing.
- * Nothing polls; the phone wakes Mavick only at those times.
+ * Uses Android's AlarmManager: one alarm per pending reminder plus the daily alarm (briefing and
+ * chores). Nothing polls; the phone wakes Mavick only at those times.
  *
  * Times are local ("09:00"), converted with the phone's current time zone when the alarm is set.
  * After a time-zone change, RescheduleReceiver sets every alarm again.
@@ -25,9 +25,7 @@ class AlarmReminderScheduler(
 
     override fun cancel(taskId: String) = alarmManager.cancel(reminderIntent(taskId))
 
-    override fun scheduleBriefing(at: LocalDateTime) = setAlarm(at, briefingIntent())
-
-    override fun cancelBriefing() = alarmManager.cancel(briefingIntent())
+    override fun scheduleDaily(at: LocalDateTime) = setAlarm(at, dailyIntent())
 
     // Lint looks only for SCHEDULE_EXACT_ALARM. Mavick declares USE_EXACT_ALARM, the reminder-app
     // equivalent on Android 13+, and checks canScheduleExactAlarms() before every exact alarm.
@@ -51,10 +49,10 @@ class AlarmReminderScheduler(
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun briefingIntent(): PendingIntent = PendingIntent.getBroadcast(
+    private fun dailyIntent(): PendingIntent = PendingIntent.getBroadcast(
         context,
         0,
-        Intent(context, ReminderAlarmReceiver::class.java).setAction(ReminderIntents.ACTION_BRIEFING),
+        Intent(context, ReminderAlarmReceiver::class.java).setAction(ReminderIntents.ACTION_DAILY),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 }

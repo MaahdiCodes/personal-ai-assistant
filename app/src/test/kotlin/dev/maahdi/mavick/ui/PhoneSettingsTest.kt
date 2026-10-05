@@ -2,6 +2,7 @@ package dev.maahdi.mavick.ui
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -52,7 +53,7 @@ class PhoneSettingsTest {
     fun `opens the screen when the phone has it`() {
         val phone = FakePhone(setOf(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS, Settings.ACTION_APPLICATION_DETAILS_SETTINGS))
 
-        PhoneSettings.open(context, PhoneSettings.battery(), phone::start)
+        PhoneSettings.open(context, PhoneSettings.battery(), start = phone::start)
 
         assertThat(phone.opened.map { it.action }).containsExactly(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
     }
@@ -61,7 +62,7 @@ class PhoneSettingsTest {
     fun `a phone without the screen shows Mavick's App info instead of crashing`() {
         val phone = FakePhone(setOf(Settings.ACTION_APPLICATION_DETAILS_SETTINGS))
 
-        PhoneSettings.open(context, PhoneSettings.battery(), phone::start)
+        PhoneSettings.open(context, PhoneSettings.battery(), start = phone::start)
 
         val opened = phone.opened.single()
         assertThat(opened.action).isEqualTo(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
@@ -75,7 +76,7 @@ class PhoneSettingsTest {
             privateScreens = setOf(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
         )
 
-        PhoneSettings.open(context, PhoneSettings.battery(), phone::start)
+        PhoneSettings.open(context, PhoneSettings.battery(), start = phone::start)
 
         assertThat(phone.opened.map { it.action }).containsExactly(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
     }
@@ -84,10 +85,50 @@ class PhoneSettingsTest {
     fun `a phone with neither screen opens nothing and does not crash`() {
         val phone = FakePhone(emptySet())
 
-        PhoneSettings.open(context, PhoneSettings.notifications(context), phone::start)
+        PhoneSettings.open(context, PhoneSettings.notifications(context), start = phone::start)
 
         assertThat(phone.opened).isEmpty()
         assertThat(phone.tried).containsExactly(Settings.ACTION_APP_NOTIFICATION_SETTINGS, Settings.ACTION_APPLICATION_DETAILS_SETTINGS).inOrder()
+    }
+
+    @Test
+    fun `notification access opens Mavick's own page, else the list of all apps, else App info`() {
+        val listener = ComponentName(context, "dev.maahdi.mavick.capture.MavickNotificationListener")
+        val detail = Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS
+        val list = Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+        val appInfo = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+
+        val full = FakePhone(setOf(detail, list, appInfo))
+        PhoneSettings.open(context, *PhoneSettings.notificationAccess(listener), start = full::start)
+        assertThat(full.opened.single().getStringExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME)).isEqualTo(listener.flattenToString())
+
+        val noDetail = FakePhone(setOf(list, appInfo))
+        PhoneSettings.open(context, *PhoneSettings.notificationAccess(listener), start = noDetail::start)
+        assertThat(noDetail.tried).containsExactly(detail, list).inOrder()
+
+        val neither = FakePhone(setOf(appInfo))
+        PhoneSettings.open(context, *PhoneSettings.notificationAccess(listener), start = neither::start)
+        assertThat(neither.tried).containsExactly(detail, list, appInfo).inOrder()
+        assertThat(neither.opened.single().action).isEqualTo(appInfo)
+    }
+
+    @Test
+    fun `Xiaomi's Autostart page falls back to App info on other phones`() {
+        val pixel = FakePhone(setOf(Settings.ACTION_APPLICATION_DETAILS_SETTINGS))
+
+        PhoneSettings.open(context, PhoneSettings.xiaomiAutostart(), start = pixel::start)
+
+        assertThat(PhoneSettings.xiaomiAutostart().component?.packageName).isEqualTo("com.miui.securitycenter")
+        assertThat(pixel.opened.single().action).isEqualTo(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+    }
+
+    @Test
+    fun `Xiaomi, Redmi and Poco phones are recognised, others not`() {
+        assertThat(PhoneSettings.isXiaomi(manufacturer = "Xiaomi", brand = "POCO")).isTrue()
+        assertThat(PhoneSettings.isXiaomi(manufacturer = "Xiaomi", brand = "Redmi")).isTrue()
+        assertThat(PhoneSettings.isXiaomi(manufacturer = "unknown", brand = "poco")).isTrue()
+        assertThat(PhoneSettings.isXiaomi(manufacturer = "Google", brand = "google")).isFalse()
+        assertThat(PhoneSettings.isXiaomi(manufacturer = "samsung", brand = "samsung")).isFalse()
     }
 
     @Test

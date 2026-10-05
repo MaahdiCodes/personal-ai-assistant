@@ -26,8 +26,8 @@ android {
         applicationId = "dev.maahdi.mavick"
         minSdk = 33
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -179,6 +179,64 @@ val allowedPermissions = setOf(
 )
 
 /**
+ * The only services Mavick may declare, each with the permission that must protect it. Mavick runs
+ * nothing in the background except its notification listener, which only Android can bind
+ * (docs/PLAN.md §5.8). A library adding a service (WorkManager, for example) fails the build.
+ */
+val allowedServices = mapOf(
+    // Phase 2: reads WhatsApp, Messenger, Gmail and Keep notifications.
+    "dev.maahdi.mavick.capture.MavickNotificationListener" to "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
+)
+
+/** Powers Mavick must never have: reading the screen, or controlling the phone as its admin. */
+val forbiddenComponentPermissions = setOf(
+    "android.permission.BIND_ACCESSIBILITY_SERVICE",
+    "android.permission.BIND_DEVICE_ADMIN",
+)
+
+/**
+ * Message reading is read-only (docs/PLAN.md §5.1): Mavick never answers, opens, dismisses or
+ * snoozes another app's notification (so no read receipts, no "online", no lost notifications),
+ * never changes Do Not Disturb or media, and never reads the screen. The build fails if app code
+ * uses any API that could do so.
+ */
+val forbiddenNotificationApis = listOf(
+    Regex(
+        """\b(cancelNotification|cancelNotifications|cancelAllNotifications|snoozeNotification|""" +
+            """requestInterruptionFilter|requestListenerHints|setNotificationsShown|RemoteInput|""" +
+            """MediaSessionManager|AccessibilityService|AccessibilityNodeInfo)\b""",
+    ),
+    // Another app's notification buttons and tap actions.
+    Regex("""\.(actionIntent|contentIntent|deleteIntent|fullScreenIntent)\b"""),
+)
+
+val checkReadOnlyNotifications = tasks.register("checkReadOnlyNotifications") {
+    group = "verification"
+    description = "Fails if app code could change, answer or open another app's notifications."
+    val sources = fileTree("src") { include("main/**/*.kt", "debug/**/*.kt", "release/**/*.kt") }
+    val root = projectDir
+    inputs.files(sources)
+    doLast {
+        val problems = sources.files.sorted().flatMap { file ->
+            file.readLines().mapIndexedNotNull { index, line ->
+                if (forbiddenNotificationApis.any { it.containsMatchIn(line) }) {
+                    "${file.relativeTo(root)}:${index + 1}: ${line.trim()}"
+                } else {
+                    null
+                }
+            }
+        }
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "Mavick must only read notifications (docs/PLAN.md §5.1), but this code uses an API that " +
+                    "could change, answer or open them:\n" + problems.joinToString("\n"),
+            )
+        }
+        logger.lifecycle("Read-only check passed: ${sources.files.size} source files")
+    }
+}
+
+/**
  * Largest APK allowed per build type, in bytes. Raise a budget deliberately (and update
  * docs/PLAN.md §5.8), never just to make a build pass. Release size: Phase 0 3.3 MB, Phase 1 4.5 MB.
  */
@@ -200,7 +258,7 @@ androidComponents {
 
         val checkPermissions = tasks.register("check${taskSuffix}Permissions") {
             group = "verification"
-            description = "Fails if the $variantName build requests a permission that is not allow-listed."
+            description = "Fails if the $variantName build requests a permission or declares a service that is not allow-listed."
             inputs.file(mergedManifest)
             doLast {
                 val androidNamespace = "http://schemas.android.com/apk/res/android"
@@ -231,9 +289,42 @@ androidComponents {
                     throw GradleException("android:allowBackup must be \"false\" in the $variantName build.")
                 }
 
+                fun elements(tag: String) = document.getElementsByTagName(tag).let { nodes ->
+                    (0 until nodes.length).map { nodes.item(it) as Element }
+                }
+
+                val services = elements("service").associate { service ->
+                    service.getAttributeNS(androidNamespace, "name") to service.getAttributeNS(androidNamespace, "permission")
+                }
+                val unexpectedServices = services.keys - allowedServices.keys
+                if (unexpectedServices.isNotEmpty()) {
+                    throw GradleException(
+                        "The $variantName build declares services that are not allow-listed: " +
+                            "${unexpectedServices.joinToString()}. Remove them (tools:node=\"remove\" in " +
+                            "AndroidManifest.xml) or, if truly needed, add them to allowedServices in " +
+                            "app/build.gradle.kts and docs/PLAN.md §5.8.",
+                    )
+                }
+                services.forEach { (name, permission) ->
+                    if (permission != allowedServices.getValue(name)) {
+                        throw GradleException("Service $name must be protected by ${allowedServices.getValue(name)}.")
+                    }
+                }
+
+                val forbidden = listOf("service", "receiver", "activity", "provider").flatMap(::elements)
+                    .filter { it.getAttributeNS(androidNamespace, "permission") in forbiddenComponentPermissions }
+                    .map { it.getAttributeNS(androidNamespace, "name") }
+                if (forbidden.isNotEmpty()) {
+                    throw GradleException(
+                        "The $variantName build declares components with forbidden powers " +
+                            "(screen reading or device admin): ${forbidden.joinToString()}.",
+                    )
+                }
+
                 logger.lifecycle(
                     "Permission check passed ($variantName): " +
-                        requested.joinToString().ifEmpty { "no permissions requested" },
+                        requested.joinToString().ifEmpty { "no permissions requested" } +
+                        "; services: " + services.keys.joinToString().ifEmpty { "none" },
                 )
             }
         }
@@ -258,9 +349,10 @@ androidComponents {
             }
         }
 
-        // An APK can only be packaged after its permissions pass, and every assembled APK is measured.
-        tasks.matching { it.name == "package$taskSuffix" }.configureEach { dependsOn(checkPermissions) }
+        // An APK can only be packaged after its permissions and the read-only check pass, and every
+        // assembled APK is measured.
+        tasks.matching { it.name == "package$taskSuffix" }.configureEach { dependsOn(checkPermissions, checkReadOnlyNotifications) }
         tasks.matching { it.name == "assemble$taskSuffix" }.configureEach { finalizedBy(checkApkSize) }
-        tasks.matching { it.name == "check" }.configureEach { dependsOn(checkPermissions) }
+        tasks.matching { it.name == "check" }.configureEach { dependsOn(checkPermissions, checkReadOnlyNotifications) }
     }
 }

@@ -1,8 +1,11 @@
 package dev.maahdi.mavick.time
 
 import java.time.DayOfWeek
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
@@ -33,6 +36,24 @@ object DueFormatter {
     }
 
     fun time(time: LocalTime, use24Hour: Boolean): String = (if (use24Hour) TIME_24_HOUR else TIME_12_HOUR).format(time)
+
+    /** "Today · 10:05" for a moment, in the phone's time zone. */
+    fun moment(at: Instant, zone: ZoneId, today: LocalDate, use24Hour: Boolean): String {
+        val local = at.atZone(zone)
+        return dueLabel(local.toLocalDate(), local.toLocalTime(), today, use24Hour)
+    }
+
+    /** How long ago: "just now", "5 min ago", "3 h ago", "2 days ago". */
+    fun ago(at: Instant, now: Instant): String {
+        val elapsed = Duration.between(at, now)
+        return when {
+            elapsed.toMinutes() < 1 -> "just now"
+            elapsed.toHours() < 1 -> "${elapsed.toMinutes()} min ago"
+            elapsed.toDays() < 1 -> "${elapsed.toHours()} h ago"
+            elapsed.toDays() == 1L -> "1 day ago"
+            else -> "${elapsed.toDays()} days ago"
+        }
+    }
 
     fun repeatLabel(rule: RepeatRule, workDays: Set<DayOfWeek>): String = when (rule) {
         is RepeatRule.Daily -> if (rule.interval == 1) "Every day" else "Every ${rule.interval} days"

@@ -2,8 +2,10 @@
 
 package dev.maahdi.mavick.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,6 +18,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -35,16 +41,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.maahdi.mavick.R
+import dev.maahdi.mavick.capture.ReadingState
 import dev.maahdi.mavick.data.settings.AppSettings
 import dev.maahdi.mavick.health.StorageStatus
 import dev.maahdi.mavick.time.DateOrder
 import dev.maahdi.mavick.time.DueFormatter
 import dev.maahdi.mavick.ui.components.TimePickerDialog
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -56,9 +65,23 @@ data class HealthInfo(
     val exactAlarmsAllowed: Boolean = true,
     val batteryUnrestricted: Boolean = true,
     val appLockAvailable: Boolean = true,
+    /** "Notification access", needed to read messages (Phase 2). */
+    val notificationAccess: Boolean = false,
+    val reading: ReadingState = ReadingState.NO_ACCESS,
+    /** When a supported app's notification last arrived. */
+    val lastSeenAt: Instant? = null,
+    /** How often Android stopped message reading in the last 7 days. */
+    val disconnectsThisWeek: Int = 0,
+    val isXiaomi: Boolean = false,
     val versionName: String = "",
     val isDebugBuild: Boolean = false,
 )
+
+/** Days a saved message is kept, offered in Settings. */
+private val RETENTION_CHOICES = listOf(1, 3, 7, 14, 30, 60, 90)
+
+/** Days without messages before a warning; 0 means never. */
+private val WARNING_CHOICES = listOf(0, 1, 2, 3, 7)
 
 /** The week as shown in Settings, starting on Sunday. */
 private val WEEK = listOf(
@@ -75,13 +98,20 @@ private val WEEK = listOf(
 fun SettingsScreen(
     settings: AppSettings,
     health: HealthInfo,
+    now: Instant,
     use24Hour: Boolean,
     onChange: ((AppSettings) -> AppSettings) -> Unit,
     onFixNotifications: () -> Unit,
     onFixBattery: () -> Unit,
+    onFixNotificationAccess: () -> Unit,
+    onRestartReading: () -> Unit,
+    onOpenAutostart: () -> Unit,
+    onOpenReading: () -> Unit,
+    onDeleteAllMessages: () -> Unit,
     onBack: () -> Unit,
 ) {
     var pickingBriefingTime by remember { mutableStateOf(false) }
+    var confirmDeleteMessages by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -160,7 +190,20 @@ fun SettingsScreen(
             }
             HorizontalDivider()
 
-            HealthSection(health, onFixNotifications, onFixBattery)
+            MessagesSection(settings, onChange, onOpenReading, onDeleteAllMessages = { confirmDeleteMessages = true })
+            HorizontalDivider()
+
+            HealthSection(
+                health,
+                now,
+                autostartOn = settings.xiaomiAutostartOn,
+                onAutostartChange = { on -> onChange { it.copy(xiaomiAutostartOn = on) } },
+                onFixNotifications = onFixNotifications,
+                onFixBattery = onFixBattery,
+                onFixNotificationAccess = onFixNotificationAccess,
+                onRestartReading = onRestartReading,
+                onOpenAutostart = onOpenAutostart,
+            )
         }
     }
 
@@ -172,10 +215,86 @@ fun SettingsScreen(
             onDismiss = { pickingBriefingTime = false },
         )
     }
+
+    if (confirmDeleteMessages) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteMessages = false },
+            title = { Text(stringResource(R.string.delete_messages_confirm_title)) },
+            text = { Text(stringResource(R.string.delete_messages_confirm_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteMessages = false
+                    onDeleteAllMessages()
+                }) { Text(stringResource(R.string.delete_messages_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteMessages = false }) { Text(stringResource(R.string.dialog_cancel)) } },
+        )
+    }
 }
 
 @Composable
-private fun HealthSection(health: HealthInfo, onFixNotifications: () -> Unit, onFixBattery: () -> Unit) {
+private fun MessagesSection(
+    settings: AppSettings,
+    onChange: ((AppSettings) -> AppSettings) -> Unit,
+    onOpenReading: () -> Unit,
+    onDeleteAllMessages: () -> Unit,
+) {
+    Text(stringResource(R.string.settings_messages), style = MaterialTheme.typography.titleMedium)
+    Column(Modifier.fillMaxWidth().clickable(onClick = onOpenReading).padding(vertical = 4.dp)) {
+        Text(stringResource(R.string.reading_title), style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.settings_reading_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    ChoiceRow(
+        title = stringResource(R.string.settings_retention),
+        current = settings.messageRetentionDays,
+        choices = RETENTION_CHOICES,
+        label = { days -> pluralStringResource(R.plurals.days, days, days) },
+        onPick = { days -> onChange { it.copy(messageRetentionDays = days) } },
+    )
+    ChoiceRow(
+        title = stringResource(R.string.settings_warning),
+        current = settings.readingWarningDays,
+        choices = WARNING_CHOICES,
+        label = { days -> if (days == 0) stringResource(R.string.warning_never) else pluralStringResource(R.plurals.days, days, days) },
+        onPick = { days -> onChange { it.copy(readingWarningDays = days) } },
+    )
+    TextButton(onClick = onDeleteAllMessages) {
+        Text(stringResource(R.string.settings_delete_messages), color = MaterialTheme.colorScheme.error)
+    }
+}
+
+/** A setting with a few choices, picked from a menu. */
+@Composable
+private fun <T> ChoiceRow(title: String, current: T, choices: List<T>, label: @Composable (T) -> String, onPick: (T) -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        Column(Modifier.fillMaxWidth().clickable { menuOpen = true }.padding(vertical = 4.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(label(current), color = MaterialTheme.colorScheme.primary)
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            choices.forEach { choice ->
+                DropdownMenuItem(text = { Text(label(choice)) }, onClick = {
+                    menuOpen = false
+                    onPick(choice)
+                })
+            }
+        }
+    }
+}
+
+@Composable
+private fun HealthSection(
+    health: HealthInfo,
+    now: Instant,
+    autostartOn: Boolean,
+    onAutostartChange: (Boolean) -> Unit,
+    onFixNotifications: () -> Unit,
+    onFixBattery: () -> Unit,
+    onFixNotificationAccess: () -> Unit,
+    onRestartReading: () -> Unit,
+    onOpenAutostart: () -> Unit,
+) {
     Text(stringResource(R.string.settings_health), style = MaterialTheme.typography.titleMedium)
     StatusRow(
         label = stringResource(R.string.status_storage),
@@ -213,8 +332,33 @@ private fun HealthSection(health: HealthInfo, onFixNotifications: () -> Unit, on
         onFix = onFixBattery.takeUnless { health.batteryUnrestricted },
     )
     StatusRow(
+        label = stringResource(R.string.status_access),
+        value = stringResource(if (health.notificationAccess) R.string.status_allowed else R.string.status_access_off),
+        isOk = health.notificationAccess,
+        onFix = onFixNotificationAccess.takeUnless { health.notificationAccess },
+        detail = stringResource(R.string.access_restricted_hint).takeUnless { health.notificationAccess },
+    )
+    StatusRow(
+        label = stringResource(R.string.status_reading),
+        value = readingText(health, now),
+        isOk = health.reading == ReadingState.OK,
+        onFix = onRestartReading.takeIf { health.reading == ReadingState.NOT_CONNECTED },
+        fixLabel = R.string.status_restart,
+        detail = health.disconnectsThisWeek.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.reading_disconnects, it, it) },
+    )
+    if (health.isXiaomi) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = autostartOn, onCheckedChange = onAutostartChange)
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.status_autostart), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.status_autostart_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(onClick = onOpenAutostart) { Text(stringResource(R.string.status_open)) }
+        }
+    }
+    StatusRow(
         label = stringResource(R.string.status_background),
-        value = stringResource(R.string.status_background_alarms),
+        value = stringResource(if (health.notificationAccess) R.string.status_background_reading else R.string.status_background_alarms),
         isOk = true,
     )
     Text(
@@ -239,9 +383,27 @@ private fun SwitchRow(title: String, summary: String, checked: Boolean, onChecke
     }
 }
 
+/** "Working · last message 5 min ago", "Stopped by Android", and so on. */
+@Composable
+private fun readingText(health: HealthInfo, now: Instant): String = when (health.reading) {
+    ReadingState.NO_ACCESS -> stringResource(R.string.reading_off)
+    ReadingState.NOT_CONNECTED -> stringResource(R.string.reading_not_connected)
+    ReadingState.QUIET -> health.lastSeenAt?.let { stringResource(R.string.reading_quiet, DueFormatter.ago(it, now)) }
+        ?: stringResource(R.string.reading_quiet_never)
+    ReadingState.OK -> health.lastSeenAt?.let { stringResource(R.string.reading_ok_last, DueFormatter.ago(it, now)) }
+        ?: stringResource(R.string.reading_ok_nothing)
+}
+
 /** One health line. [isOk] null means "still checking". */
 @Composable
-private fun StatusRow(label: String, value: String, isOk: Boolean?, onFix: (() -> Unit)? = null) {
+private fun StatusRow(
+    label: String,
+    value: String,
+    isOk: Boolean?,
+    onFix: (() -> Unit)? = null,
+    @StringRes fixLabel: Int = R.string.status_fix,
+    detail: String? = null,
+) {
     val marker = when (isOk) {
         true -> "✓"
         false -> "✗"
@@ -257,7 +419,8 @@ private fun StatusRow(label: String, value: String, isOk: Boolean?, onFix: (() -
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (onFix != null) TextButton(onClick = onFix) { Text(stringResource(R.string.status_fix)) }
+        if (onFix != null) TextButton(onClick = onFix) { Text(stringResource(fixLabel)) }
     }
 }

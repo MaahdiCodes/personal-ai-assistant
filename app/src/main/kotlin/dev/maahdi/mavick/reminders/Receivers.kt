@@ -11,7 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** A reminder or briefing alarm went off. */
+/** A reminder alarm or the daily alarm went off. */
 class ReminderAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val engine = engineOf(context)
@@ -20,7 +20,7 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
                 val taskId = ReminderIntents.taskIdOf(intent) ?: return
                 runInBackground { engine.onReminderAlarm(taskId) }
             }
-            ReminderIntents.ACTION_BRIEFING -> runInBackground { engine.onBriefingAlarm() }
+            ReminderIntents.ACTION_DAILY -> runInBackground { engine.onDailyAlarm() }
         }
     }
 }

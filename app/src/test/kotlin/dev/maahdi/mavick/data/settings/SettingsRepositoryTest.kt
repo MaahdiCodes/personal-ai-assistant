@@ -4,8 +4,13 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import dev.maahdi.mavick.capture.AppCapture
+import dev.maahdi.mavick.capture.CaptureMode
+import dev.maahdi.mavick.capture.CapturePause
+import dev.maahdi.mavick.capture.SourceApp
 import dev.maahdi.mavick.time.DateOrder
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalTime
 import org.junit.After
 import org.junit.Test
@@ -33,6 +38,86 @@ class SettingsRepositoryTest {
         )
         assertThat(settings.dateOrder).isEqualTo(DateOrder.DAY_MONTH)
         assertThat(settings.notificationPermissionRequested).isFalse()
+        SourceApp.entries.forEach { app -> assertThat(settings.captureFor(app)).isEqualTo(AppCapture(enabled = true, mode = CaptureMode.ALL_EXCEPT)) }
+        assertThat(settings.capturePause).isEqualTo(CapturePause.Off)
+        assertThat(settings.messageRetentionDays).isEqualTo(14)
+        assertThat(settings.readingWarningDays).isEqualTo(1)
+        assertThat(settings.xiaomiAutostartOn).isFalse()
+        assertThat(settings.defaultRulesAdded).isFalse()
+    }
+
+    @Test
+    fun `message reading settings are saved and survive a restart`() {
+        val until = Instant.parse("2026-10-05T10:00:00Z")
+        SettingsRepository(preferences).update {
+            it.copy(
+                appCapture = it.appCapture +
+                    (SourceApp.GMAIL to AppCapture(enabled = false)) +
+                    (SourceApp.WHATSAPP to AppCapture(mode = CaptureMode.ONLY_LISTED)),
+                capturePause = CapturePause.Until(until),
+                messageRetentionDays = 30,
+                readingWarningDays = 3,
+                xiaomiAutostartOn = true,
+                defaultRulesAdded = true,
+            )
+        }
+
+        val reloaded = SettingsRepository(preferences).current
+
+        assertThat(reloaded.captureFor(SourceApp.GMAIL)).isEqualTo(AppCapture(enabled = false))
+        assertThat(reloaded.captureFor(SourceApp.WHATSAPP)).isEqualTo(AppCapture(mode = CaptureMode.ONLY_LISTED))
+        assertThat(reloaded.captureFor(SourceApp.MESSENGER)).isEqualTo(AppCapture())
+        assertThat(reloaded.capturePause).isEqualTo(CapturePause.Until(until))
+        assertThat(reloaded.messageRetentionDays).isEqualTo(30)
+        assertThat(reloaded.readingWarningDays).isEqualTo(3)
+        assertThat(reloaded.xiaomiAutostartOn).isTrue()
+        assertThat(reloaded.defaultRulesAdded).isTrue()
+    }
+
+    @Test
+    fun `a pause until resumed survives a restart, and resuming clears it`() {
+        val repository = SettingsRepository(preferences)
+        repository.update { it.copy(capturePause = CapturePause.UntilResumed) }
+        assertThat(SettingsRepository(preferences).current.capturePause).isEqualTo(CapturePause.UntilResumed)
+
+        repository.update { it.copy(capturePause = CapturePause.Off) }
+
+        assertThat(SettingsRepository(preferences).current.capturePause).isEqualTo(CapturePause.Off)
+    }
+
+    @Test
+    fun `a damaged pause stays paused, so reading never restarts by accident`() {
+        preferences.edit().putString("capture_pause", "garbage").commit()
+
+        assertThat(SettingsRepository(preferences).current.capturePause).isEqualTo(CapturePause.UntilResumed)
+    }
+
+    @Test
+    fun `out-of-range numbers are kept in range`() {
+        val repository = SettingsRepository(preferences)
+
+        repository.update { it.copy(messageRetentionDays = 0, readingWarningDays = 99) }
+        assertThat(repository.current.messageRetentionDays).isEqualTo(1)
+        assertThat(repository.current.readingWarningDays).isEqualTo(7)
+
+        repository.update { it.copy(messageRetentionDays = 500, readingWarningDays = -1) }
+        assertThat(repository.current.messageRetentionDays).isEqualTo(90)
+        assertThat(repository.current.readingWarningDays).isEqualTo(0)
+    }
+
+    @Test
+    fun `damaged message reading values fall back to their defaults`() {
+        preferences.edit()
+            .putInt("message_retention_days", 0)
+            .putInt("reading_warning_days", 42)
+            .putString("capture_WHATSAPP_mode", "SOMETIMES")
+            .commit()
+
+        val settings = SettingsRepository(preferences).current
+
+        assertThat(settings.messageRetentionDays).isEqualTo(14)
+        assertThat(settings.readingWarningDays).isEqualTo(1)
+        assertThat(settings.captureFor(SourceApp.WHATSAPP)).isEqualTo(AppCapture())
     }
 
     @Test

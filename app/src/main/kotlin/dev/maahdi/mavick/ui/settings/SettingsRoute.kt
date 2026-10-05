@@ -7,61 +7,109 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.PowerManager
 import android.text.format.DateFormat
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.maahdi.mavick.AppContainer
+import dev.maahdi.mavick.capture.ListenerRestart
+import dev.maahdi.mavick.capture.ReadingHealth
+import dev.maahdi.mavick.data.health.HealthEventType
 import dev.maahdi.mavick.data.settings.AppSettings
 import dev.maahdi.mavick.health.StorageStatus
 import dev.maahdi.mavick.security.canAuthenticate
 import dev.maahdi.mavick.ui.PhoneSettings
+import java.time.Duration
+import java.time.Instant
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsRoute(container: AppContainer, onBack: () -> Unit) {
+fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
-    var health by remember { mutableStateOf(readHealth(context)) }
+    var health by remember { mutableStateOf(readHealth(context, container)) }
     var storage by remember { mutableStateOf<StorageStatus>(StorageStatus.Checking) }
+    var disconnects by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) {
         // Re-read when coming back from Android's settings, where the user may have fixed something.
-        health = readHealth(context)
+        health = readHealth(context, container)
         onPauseOrDispose { }
     }
-    LaunchedEffect(Unit) { storage = container.storageHealthCheck.run() }
+    LaunchedEffect(Unit) {
+        storage = container.storageHealthCheck.run()
+        disconnects = countRecentDisconnects(container)
+    }
     BackHandler(onBack = onBack)
 
     SettingsScreen(
         settings = settings,
-        health = health.copy(storage = storage),
+        health = health.copy(storage = storage, disconnectsThisWeek = disconnects),
+        now = Instant.now(container.clock()),
         use24Hour = DateFormat.is24HourFormat(context),
         onChange = { change: (AppSettings) -> AppSettings ->
             container.settings.update(change)
-            container.reminderEngine.scheduleBriefing()
+            container.reminderEngine.scheduleDailyAlarm()
         },
         onFixNotifications = { PhoneSettings.open(context, PhoneSettings.notifications(context)) },
         onFixBattery = { PhoneSettings.open(context, PhoneSettings.battery()) },
+        onFixNotificationAccess = { PhoneSettings.open(context, *PhoneSettings.notificationAccess(container.listenerComponent)) },
+        onRestartReading = {
+            ListenerRestart.restart(context.packageManager, container.listenerComponent)
+            health = readHealth(context, container)
+        },
+        onOpenAutostart = { PhoneSettings.open(context, PhoneSettings.xiaomiAutostart()) },
+        onOpenReading = onOpenReading,
+        onDeleteAllMessages = { scope.launch { container.openMessages().deleteAll() } },
         onBack = onBack,
     )
 }
 
-/** Everything in the Health section except storage, which needs a database check. */
-private fun readHealth(context: Context): HealthInfo {
+/** Everything in the Health section except what needs the database. */
+private fun readHealth(context: Context, container: AppContainer): HealthInfo {
     val packageInfo = context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
+    val access = container.hasNotificationAccess()
+    val status = container.captureStatus.snapshot()
+    val quietAfter = Duration.ofDays(maxOf(1, container.settings.current.readingWarningDays).toLong())
     return HealthInfo(
         hasInternetPermission = context.checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED,
         notificationsAllowed = NotificationManagerCompat.from(context).areNotificationsEnabled(),
         exactAlarmsAllowed = context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms(),
         batteryUnrestricted = context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName),
         appLockAvailable = canAuthenticate(context),
+        notificationAccess = access,
+        reading = ReadingHealth.state(access, status, Instant.now(container.clock()), quietAfter),
+        lastSeenAt = status.lastSeenAt,
+        isXiaomi = PhoneSettings.isXiaomi(),
         versionName = packageInfo.versionName.orEmpty(),
         isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0,
     )
+}
+
+/** How often Android stopped message reading in the last 7 days; 0 if storage can't be read. */
+private suspend fun countRecentDisconnects(container: AppContainer): Int = withContext(Dispatchers.IO) {
+    val since = Instant.now(container.clock()).minus(Duration.ofDays(7))
+    try {
+        container.healthEvents.count(HealthEventType.LISTENER_DISCONNECTED, since)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w("Mavick", "Listener history unavailable: ${e.javaClass.simpleName}")
+        0
+    } catch (e: LinkageError) {
+        0 // the encryption library failed to load; storage health explains it
+    }
 }

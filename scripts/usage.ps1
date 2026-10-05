@@ -2,9 +2,11 @@
 .SYNOPSIS
     Shows what Mavick uses on a phone: storage, memory, CPU, and anything it runs in the background.
 .DESCRIPTION
-    Use it any time to check that Mavick stays light. Background services and jobs should be 0;
-    scheduled alarms should equal your pending reminders plus one for the morning briefing.
-    Memory and CPU only apply while the app is open.
+    Use it any time to check that Mavick stays light. Scheduled jobs should be 0. Background
+    services should be 0, or 1 once Notification access is on: the message listener, which Android
+    keeps connected and wakes only when a notification arrives. Scheduled alarms should equal your
+    pending reminders plus one daily alarm. Memory and CPU apply while Mavick runs (the app is open,
+    or the listener is connected).
 .PARAMETER Phone
     "pixel", "poco" or a serial. Needed only when more than one phone is connected.
 .PARAMETER DebugBuild

@@ -2,7 +2,7 @@
 .SYNOPSIS
     Runs Mavick's tests.
 .DESCRIPTION
-    Always runs the PC tests, the permission checks and Android Lint. With -OnPhone it also runs the on-phone
+    Always runs the PC tests, the permission and read-only checks and Android Lint. With -OnPhone it also runs the on-phone
     tests (real encryption hardware). Those install the temporary "Mavick Debug" app and its test
     app, and Gradle removes both afterwards. Your real Mavick and its data are never touched.
 .PARAMETER OnPhone
@@ -21,9 +21,9 @@ param(
 $targets = @()
 if ($OnPhone) { $targets = @(Select-Phones -Name $Phone) }
 
-Write-Step 'Running the PC tests, the permission checks and Android Lint'
+Write-Step 'Running the PC tests, the permission and read-only checks, and Android Lint'
 try {
-    Invoke-Gradle -Tasks @(':app:testDebugUnitTest', ':app:checkDebugPermissions', ':app:checkReleasePermissions', ':app:lintDebug')
+    Invoke-Gradle -Tasks @(':app:testDebugUnitTest', ':app:checkDebugPermissions', ':app:checkReleasePermissions', ':app:checkReadOnlyNotifications', ':app:lintDebug')
 } catch {
     Write-Host "Test report: $RepoRoot\app\build\reports\tests\testDebugUnitTest\index.html" -ForegroundColor Yellow
     Write-Host "Lint report: $RepoRoot\app\build\reports\lint-results-debug.html" -ForegroundColor Yellow

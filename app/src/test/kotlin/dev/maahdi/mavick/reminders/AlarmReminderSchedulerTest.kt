@@ -73,13 +73,26 @@ class AlarmReminderSchedulerTest {
     }
 
     @Test
-    fun `the briefing alarm is separate from task alarms`() {
+    fun `the daily alarm is separate from task alarms, and setting it again replaces it`() {
         scheduler.schedule("task-1", LocalDateTime.of(2026, 10, 5, 17, 0))
-        scheduler.scheduleBriefing(LocalDateTime.of(2026, 10, 6, 8, 0))
+        scheduler.scheduleDaily(LocalDateTime.of(2026, 10, 6, 8, 0))
+        scheduler.scheduleDaily(LocalDateTime.of(2026, 10, 7, 8, 0))
 
-        scheduler.cancelBriefing()
+        scheduler.cancel("task-1")
 
-        assertThat(alarms().map(::taskIdOf)).containsExactly("task-1")
+        val daily = alarms().single()
+        assertThat(taskIdOf(daily)).isNull()
+        // 08:00 in Dhaka is 02:00 UTC.
+        assertThat(daily.getTriggerAtMs()).isEqualTo(Instant.parse("2026-10-07T02:00:00Z").toEpochMilli())
+    }
+
+    @Test
+    fun `the daily alarm keeps the action of the old briefing alarm, so an update replaces it`() {
+        scheduler.scheduleDaily(LocalDateTime.of(2026, 10, 6, 8, 0))
+
+        @Suppress("DEPRECATION")
+        val intent = shadowOf(alarms().single().operation).savedIntent
+        assertThat(intent.action).isEqualTo("dev.maahdi.mavick.action.BRIEFING")
     }
 
     @Test

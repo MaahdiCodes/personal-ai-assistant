@@ -6,6 +6,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import dev.maahdi.mavick.data.health.HealthEventDao
+import dev.maahdi.mavick.data.health.HealthEventEntity
+import dev.maahdi.mavick.data.message.MessageDao
+import dev.maahdi.mavick.data.message.MessageEntity
+import dev.maahdi.mavick.data.rules.ExclusionRuleDao
+import dev.maahdi.mavick.data.rules.ExclusionRuleEntity
 import dev.maahdi.mavick.data.security.DatabaseKeyRepository
 import dev.maahdi.mavick.data.task.TaskDao
 import dev.maahdi.mavick.data.task.TaskEntity
@@ -15,16 +21,23 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  * Version history (schemas in app/schemas, migrations tested in MigrationTest):
  * 1. Phase 0: tasks.
  * 2. Phase 1: reminder time, repeat rule, completion time.
+ * 3. Phase 2: messages read from notifications, the rules about what to read, listener health.
  */
 @Database(
-    entities = [TaskEntity::class],
-    version = 2,
+    entities = [TaskEntity::class, MessageEntity::class, ExclusionRuleEntity::class, HealthEventEntity::class],
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 @TypeConverters(Converters::class)
 abstract class MavickDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
+
+    abstract fun messageDao(): MessageDao
+
+    abstract fun exclusionRuleDao(): ExclusionRuleDao
+
+    abstract fun healthEventDao(): HealthEventDao
 
     companion object {
         const val FILE_NAME = "mavick.db"

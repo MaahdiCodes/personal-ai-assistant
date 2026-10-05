@@ -1,5 +1,6 @@
 package dev.maahdi.mavick.share
 
+import dev.maahdi.mavick.capture.SourceApp
 import dev.maahdi.mavick.data.task.TaskDraft
 import dev.maahdi.mavick.data.task.TaskSource
 import dev.maahdi.mavick.time.WhenParser
@@ -10,7 +11,7 @@ import java.time.LocalDateTime
  * opens in the editor, so nothing is saved until you press Save.
  */
 object SharedText {
-    const val KEEP_PACKAGE = "com.google.android.keep"
+    val KEEP_PACKAGE = SourceApp.KEEP.packageName
     private const val MAX_SHARED_TEXT_LENGTH = 5_000
 
     /**

@@ -110,6 +110,7 @@ class ScreensTest {
                 onOpenTask = {},
                 onNewTask = {},
                 onOpenSettings = {},
+                onOpenInbox = {},
                 notificationsBlocked = false,
                 onFixNotifications = {},
                 snackbarHostState = SnackbarHostState(),

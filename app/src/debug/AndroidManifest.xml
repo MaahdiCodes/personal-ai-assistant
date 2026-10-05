@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            Debug builds only: scripts/record-notifications.ps1 switches the notification recorder
+            on and off. android.permission.DUMP means only adb (the shell) can send it, not apps.
+        -->
+        <receiver
+            android:name=".capture.RecorderControlReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="dev.maahdi.mavick.debug.RECORD" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

@@ -14,6 +14,7 @@ class ReminderEngine(
     private val scheduler: ReminderScheduler,
     private val settings: SettingsRepository,
     private val clock: () -> Clock,
+    private val chores: DailyChores = DailyChores.NONE,
 ) {
     private val resyncedThisProcess = AtomicBoolean(false)
 
@@ -37,33 +38,37 @@ class ReminderEngine(
      */
     suspend fun resync() {
         tasks.rescheduleAll().forEach { notifier.showReminder(it, missed = true) }
-        scheduleBriefing()
+        scheduleDailyAlarm()
         tasks.purgeOldDeleted()
+        chores.cleanUp()
     }
 
     suspend fun resyncOncePerProcess() {
         if (resyncedThisProcess.compareAndSet(false, true)) resync()
     }
 
-    /** The briefing runs every day, weekends included. */
-    fun scheduleBriefing() {
-        val current = settings.current
-        if (!current.briefingEnabled) {
-            scheduler.cancelBriefing()
-            return
-        }
-        val now = LocalDateTime.now(clock())
-        val todayAt = now.toLocalDate().atTime(current.briefingTime)
-        scheduler.scheduleBriefing(if (todayAt.isAfter(now)) todayAt else todayAt.plusDays(1))
+    /**
+     * Sets the daily alarm at the briefing time. It runs every day, weekends included, even with
+     * the briefing off, because it also deletes old messages and checks message reading.
+     */
+    fun scheduleDailyAlarm() = scheduleDailyAlarm(notBefore = LocalDateTime.now(clock()))
+
+    private fun scheduleDailyAlarm(notBefore: LocalDateTime) {
+        val todayAt = notBefore.toLocalDate().atTime(settings.current.briefingTime)
+        scheduler.scheduleDaily(if (todayAt.isAfter(notBefore)) todayAt else todayAt.plusDays(1))
     }
 
-    /** Shows the briefing (only if something is due) and sets the next one. */
-    suspend fun onBriefingAlarm() {
+    /** The daily alarm went off: sets tomorrow's first, then the briefing (if on and anything is due), then the chores. */
+    suspend fun onDailyAlarm() {
+        // First, so nothing below can stop tomorrow's alarm. The minute's margin keeps an alarm
+        // that fires a moment early from setting itself again for today.
+        scheduleDailyAlarm(notBefore = LocalDateTime.now(clock()).plusMinutes(1))
         if (settings.current.briefingEnabled) {
             val briefing = tasks.briefing(LocalDate.now(clock()))
             if (!briefing.isEmpty) notifier.showBriefing(briefing)
         }
-        scheduleBriefing()
+        chores.cleanUp()
+        chores.daily()
     }
 
     companion object {

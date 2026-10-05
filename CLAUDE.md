@@ -17,11 +17,16 @@ The rules that matter most:
 - **Branch:** work on `develop`, then merge into `main` and push both. A `phase-N` tag marks a
   phase that passed its phone check.
 - **Before ending any piece of work:**
-  1. `.\scripts\test.ps1` must pass: tests, Lint and permission checks.
+  1. `.\scripts\test.ps1` must pass: tests, Lint, and the permission and read-only checks.
   2. Update docs/PLAN.md: §0 and the status tables in §7.
   3. Commit and push `develop`.
 - **Permissions:** never add one without also updating `allowedPermissions` in
-  `app/build.gradle.kts` and the plan. No `INTERNET` permission, ever.
+  `app/build.gradle.kts` and the plan. No `INTERNET` permission, ever. The notification listener
+  is the only allowed service (`allowedServices`).
+- **Message reading is read-only:** never answer, open, dismiss or snooze another app's
+  notification, or read the screen (no read receipts, no "online", no lost notifications).
+  `checkReadOnlyNotifications` fails the build on the APIs that could; don't name them in
+  comments either.
 - **Privacy:** never log task or message content, and never commit real messages.
 - **Signing key:** never create the user's release signing key or handle its password. The user
   runs `scripts/new-signing-key.ps1` themselves.

@@ -17,3 +17,6 @@ keystore.properties
 
 # Real messages used for AI evaluation (Phase 3) stay on this PC only
 /eval/private/
+
+# Raw notifications from scripts/record-notifications.ps1: message text, so never committed
+/recordings/

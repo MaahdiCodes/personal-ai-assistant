@@ -6,8 +6,16 @@ import android.net.Uri
 /** Intent actions and task addresses shared by alarms, notifications and the app screen. */
 object ReminderIntents {
     const val ACTION_REMINDER = "dev.maahdi.mavick.action.REMINDER"
-    const val ACTION_BRIEFING = "dev.maahdi.mavick.action.BRIEFING"
+
+    /**
+     * The daily alarm (briefing and chores). Keeps the old "BRIEFING" text so that, after an
+     * update, the new alarm replaces the one already set instead of running beside it.
+     */
+    const val ACTION_DAILY = "dev.maahdi.mavick.action.BRIEFING"
     const val ACTION_OPEN_TASK = "dev.maahdi.mavick.action.OPEN_TASK"
+
+    /** Opens Settings, where the Health section is (from a reading warning). */
+    const val ACTION_OPEN_SETTINGS = "dev.maahdi.mavick.action.OPEN_SETTINGS"
 
     private const val SCHEME = "mavick"
     private const val TASK_HOST = "task"

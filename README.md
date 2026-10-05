@@ -7,9 +7,12 @@ The full plan, decisions and roadmap are in [docs/PLAN.md](docs/PLAN.md). **Pick
 up in a new session? Start with §0 of the plan:** it has the current state, what's next, and how
 to build and test.
 
-**Now working (Phase 1):** task lists, quick-add in plain English ("Pay rent every month on the
-1st 10am"), reminders with Done / Snooze / Tomorrow, a daily morning briefing, app lock, and
-"Send to Mavick" from Google Keep. To check it on a phone, follow
+**Phases 1–2:** task lists, quick-add in plain English ("Pay rent every month on the 1st 10am"),
+reminders with Done / Snooze / Tomorrow, a daily morning briefing, app lock, and "Send to Mavick"
+from Google Keep. Mavick also reads WhatsApp, Messenger, Gmail and Keep notifications (read-only:
+it never sends, marks as read or dismisses anything), skips the chats, people and words you
+exclude, and keeps the rest encrypted for 14 days in its Inbox, where any message becomes a task.
+"Add to Mavick" works on text selected in any app. To check it on a phone, follow
 [docs/PHONE_CHECKLIST.md](docs/PHONE_CHECKLIST.md).
 
 ## Scripts
@@ -24,6 +27,7 @@ Run these from the project folder in PowerShell.
 | `.\scripts\test.ps1 [-OnPhone] [-Phone pixel\|poco]` | Runs the tests. `-OnPhone` adds the tests that need a real phone. |
 | `.\scripts\usage.ps1 [-Phone pixel\|poco]` | Shows Mavick's storage, memory and CPU use, plus anything it runs in the background. |
 | `.\scripts\logs.ps1 [-Phone pixel\|poco]` | Shows Mavick's live log. Message contents are never logged. |
+| `.\scripts\record-notifications.ps1 -Start\|-Stop [-Phone pixel\|poco]` | Records raw notifications with the "Mavick Debug" app, to check the parsers. Fake test messages only; files go to the git-ignored `recordings` folder. |
 
 `-Phone` matches part of the phone's name (`pixel`, `poco`) or its serial. You only need it when
 both phones are connected.
@@ -39,6 +43,9 @@ both phones are connected.
 
 - **Permission allow-list:** the build fails if the app requests any permission not explicitly
   allowed in `app/build.gradle.kts`, so internet access can never slip in through a library.
+- **Service allow-list:** the notification listener is the only service, and only Android can bind it.
+- **Read-only check:** the build fails if any code could answer, open, dismiss or snooze another
+  app's notification, or read the screen (docs/PLAN.md §5.1).
 - **Size budget:** the build fails if the release APK grows past its budget (docs/PLAN.md §5.8).
 
 ## Signing key

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -19,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -36,7 +36,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,6 +60,7 @@ import dev.maahdi.mavick.data.task.TaskPriority
 import dev.maahdi.mavick.data.task.TaskStatus
 import dev.maahdi.mavick.time.DueFormatter
 import dev.maahdi.mavick.time.ParsedTask
+import dev.maahdi.mavick.ui.components.Banner
 import java.time.DayOfWeek
 import java.time.LocalDate
 
@@ -83,6 +83,7 @@ fun TasksScreen(
     onOpenTask: (TaskEntity) -> Unit,
     onNewTask: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenInbox: () -> Unit,
     notificationsBlocked: Boolean,
     onFixNotifications: () -> Unit,
     snackbarHostState: SnackbarHostState,
@@ -95,6 +96,9 @@ fun TasksScreen(
                 actions = {
                     IconButton(onClick = onNewTask) {
                         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.new_task))
+                    }
+                    IconButton(onClick = onOpenInbox) {
+                        Icon(Icons.Filled.Email, contentDescription = stringResource(R.string.open_inbox))
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.open_settings))
@@ -278,16 +282,6 @@ fun previewSummary(parsed: ParsedTask, today: LocalDate, workDays: Set<DayOfWeek
     DueFormatter.dueLabel(parsed.dueDate, parsed.dueTime, today, use24Hour).takeIf { it.isNotEmpty() },
     parsed.repeatRule?.let { DueFormatter.repeatLabel(it, workDays) },
 ).joinToString(" · ")
-
-@Composable
-private fun Banner(message: String, action: String?, onAction: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
-            if (action != null) TextButton(onClick = onAction) { Text(action) }
-        }
-    }
-}
 
 const val QUICK_ADD_FIELD_TAG = "quickAddField"
 const val QUICK_ADD_PREVIEW_TAG = "quickAddPreview"
