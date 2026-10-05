@@ -1,7 +1,7 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phases 0 and 1 are coded, pass 286 PC tests, and passed a phone-and-account safety audit before the first install (§0.1). Nothing has run on a phone yet: waiting on the user's phone check ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)).
-> **Last updated:** 2026-10-05, after the pre-install safety audit.
+> **Status:** Phases 0 and 1 are coded, pass 295 PC tests, and passed a phone-and-account safety audit before the first install (§0.1). Installed on the Pixel 7 Pro; the full phone check on both phones is still pending ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md)).
+> **Last updated:** 2026-10-05, after the first install on the Pixel (quick-add fix for dotted times).
 > **Next step:** the user runs the phone check on both phones → record the results → tag `phase-1` → start Phase 2.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
@@ -18,7 +18,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 |---|---|---|
 | Plan | Decisions, design, roadmap (this document) | ✅ |
 | 0. Foundation | Project, encrypted storage, safety checks, scripts | 🧪 Code and tests done. Phone check pending. |
-| 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done (286 PC tests in total). Phone check pending, together with Phase 0. |
+| 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done (295 PC tests in total). Phone check pending, together with Phase 0. |
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail notifications, exclusions | ⬜ |
 | 3. AI suggestions | On-device AI turning messages into suggested tasks | ⬜ |
 | 4. Calendar + planning | Calendar sync, clashes, widget | ⬜ |
@@ -26,7 +26,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 | 6. Combined task list | One list across both phones | ⬜ |
 
 - **Git:** remote `https://github.com/MaahdiCodes/personal-ai-assistant` (private). On 2026-10-05 the user asked to merge `develop` into `main` before the phone check, so **`main` and `develop` are identical** and both hold Phase 0–1 (not yet phone-verified). New work still goes on **`develop`**, then is merged into `main` and pushed; a tag `phase-N` marks each phase that passes its phone check.
-- **Nothing has run on a phone yet:** no phone has been connected to the PC, the release build has never been installed, and the on-phone tests (`app/src/androidTest`) compile but have never run.
+- **First phone use (2026-10-05):** the user installed the release build on the **Pixel 7 Pro** and started trying quick-add. "call me today at 10.08 AM" became 8 AM because only "10:08" was understood; fixed the same day (dotted times, §5.4). The full phone check is still to be done on both phones, and the on-phone tests (`app/src/androidTest`) have not run yet. The Poco has not been connected.
 - **Safety audit (2026-10-05, before the first install):** every source file, script and the merged release manifest were reviewed.
   - **Accounts:** Phases 0–1 can't affect any account. There is no internet permission, no account access, no message reading, and no access to other apps or their data.
   - **Phone:** Phases 0–1 can't harm the phone. The release manifest has 4 permissions and 0 services. Nothing runs in the background except reminder alarms. No phone setting is changed. The scripts run only read-only `adb` commands plus install and start of Mavick's own package. Uninstalling removes everything.
@@ -59,7 +59,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 1. `git fetch`, `git switch develop`, `git pull`. The local folder `E:\Personal\personal-ai-assistant` is already on `develop`.
 2. Read §0, then the sections for the phase being worked on.
 3. Check that the baseline passes:
-   - **Windows:** `.\scripts\test.ps1` (286 tests, Lint, permission checks).
+   - **Windows:** `.\scripts\test.ps1` (295 tests, Lint, permission checks).
    - **Linux or macOS:** `./gradlew :app:testDebugUnitTest :app:lintDebug :app:checkDebugPermissions :app:checkReleasePermissions`. This needs JDK 17+ and an Android SDK with platform 36 and build-tools 36.1. The PowerShell scripts are Windows-only.
 4. Ask the user for anything in §0.2 that is still missing before starting work that depends on it.
 
@@ -386,11 +386,12 @@ Further rules:
 - **Notification channels:** Reminders (high importance) and Morning briefing (default). Suggestions (Phase 3) and Health warnings (Phase 2) are added later.
 - **Morning briefing:** every day, weekends included, at a time you choose (default 08:00). Lists overdue and today's tasks, and only appears if there are any. Pending AI suggestions join it in Phase 3.
 
-**Quick-add language** (`time/WhenParser.kt`, 119 tested phrases). Recognised phrases are removed and the rest becomes the title. Rules worth knowing:
+**Quick-add language** (`time/WhenParser.kt`, 128 tested phrases). Recognised phrases are removed and the rest becomes the title. Rules worth knowing:
 - A weekday ("friday", "this friday", "next friday") means the next one after today.
 - A time without a date means today, or tomorrow if that time has passed.
 - An hour without am/pm: 1–6 and 12 are afternoon, 7–11 morning ("at 5" = 17:00), unless "morning", "evening" and so on say otherwise. "06:30" (leading zero) is taken as written.
-- Numbers like 12/10 follow the date-order setting (day/month by default). Only "/" is a date separator, so "1.5k" stays text.
+- Minutes follow a colon or a dot. A dot counts only with am/pm ("10.08 AM") or after "at", "by", "@" and so on ("at 10.30"), so a price like "Pay 10.50" stays text.
+- Numbers like 12/10 follow the date-order setting (day/month by default). Only "/" is a date separator, so "1.5k" and "10.08.2026" stay text.
 - "tonight" typed after 20:00 still means today, without a time. "remind me to …" and "don't forget to …" are dropped from the title.
 
 ### 5.5 Data model
@@ -559,15 +560,16 @@ Times assume part-time work, with Claude writing most of the code.
 | Item | Status |
 |---|---|
 | Today / Upcoming / Done lists, editor, quick-add with preview | ✅ Done |
-| Quick-add language (dates, times, repeats, "in 2 hours", "every work day") | ✅ Done. 119 example phrases tested. |
+| Quick-add language (dates, times, repeats, "in 2 hours", "every work day") | ✅ Done. 128 example phrases tested. |
 | Repeats: every day / N days / work days / weekly / monthly / yearly | ✅ Done, including month-end and 29 February |
 | Reminders: exact alarms, Done / Snooze / Tomorrow, missed after restart, reset on time-zone change | ✅ Done. Notifications are private on the lock screen. |
 | Morning briefing, every day | ✅ Done. Only appears when something is due. |
 | App lock (fingerprint / phone PIN, after 5 min away) | ✅ Done |
 | Share from Google Keep (or any app) into a new task | ✅ Done |
 | Database upgrade 1 → 2 | ✅ Done. Migration test shows Phase 0 tasks are kept. |
-| PC tests + Lint | ✅ 286 tests passing, Lint: no issues |
+| PC tests + Lint | ✅ 295 tests passing, Lint: no issues |
 | Release APK | ✅ 4.5 MB (budget 8 MB). Permissions: notifications, exact alarms, restart, fingerprint, nothing else. 0 services. |
+| First use on the Pixel: "10.08 AM" read as 8 AM | ✅ Fixed 2026-10-05: dotted times ("10.08 AM", "at 10.30") understood; "Pay 10.50" and "10.08.2026" stay text. 9 new phrase tests. |
 | Pre-install safety audit (accounts, phone, scripts, merged manifest) | ✅ 2026-10-05 (§0.1). Fixed: Fix buttons fall back to App info instead of crashing; styled shared text accepted. Checklist: Poco test switch, time-zone wording, turning developer settings off. |
 | On-phone end-to-end reminder test | ⏳ Written (`ReminderDeliveryTest`). Runs with `.\scripts\test.ps1 -OnPhone`. |
 | Phone check on both phones | ⏳ [PHONE_CHECKLIST.md](PHONE_CHECKLIST.md) |
@@ -576,11 +578,11 @@ Times assume part-time work, with Claude writing most of the code.
 
 ## 8. Testing strategy
 
-**As built (Phases 0–1): 286 PC tests and 3 on-phone test classes.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler and notifier (same file), and the `task()` fixture (`sharedTest`).
+**As built (Phases 0–1): 295 PC tests and 3 on-phone test classes.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler and notifier (same file), and the `task()` fixture (`sharedTest`).
 
 | Test class | Runs on | Covers |
 |---|---|---|
-| `WhenParserTest` | PC (JVM) | 119 quick-add phrases: relative days, weekdays, parts of the day, times, written dates, day of the month, repeats, and text that must stay unparsed |
+| `WhenParserTest` | PC (JVM) | 128 quick-add phrases: relative days, weekdays, parts of the day, times, written dates, day of the month, repeats, and text that must stay unparsed |
 | `RepeatRuleTest` | PC (JVM) | Stored forms never change, damaged forms are rejected, next occurrence, month-end, 29 February |
 | `DueFormatterTest`, `TaskDraftTest`, `EditorStateTest`, `TasksUiStateTest`, `SharedTextTest`, `AppLockTest` | PC (JVM) | Labels, draft clean-up, editor mapping (custom repeats kept), list sections, Keep sharing, lock timing |
 | `DatabaseKeyRepositoryTest`, `WrappedSecretCodecTest`, `ConvertersTest`, `StorageHealthCheckTest` | PC (JVM) | Database key creation and failure cases, stored formats, health check |

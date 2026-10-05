@@ -123,6 +123,14 @@ class WhenParserTest(private val case: Case) {
             Case("Call mom 12pm", "Call mom", "2026-10-05", "12:00"),
             Case("Call @5pm", "Call", "2026-10-05", "17:00"),
             Case("Call at 5 p.m.", "Call", "2026-10-05", "17:00"),
+            // A dot between hours and minutes, as often written ("10.30")
+            Case("call me today at 10.08 AM", "call me", "2026-10-05", "10:08"),
+            Case("Call mom at 10.08am", "Call mom", "2026-10-05", "10:08"),
+            Case("Call mom 9.15 p.m.", "Call mom", "2026-10-05", "21:15"),
+            Case("Meeting at 10.30", "Meeting", "2026-10-05", "10:30"),
+            Case("Meeting at 5.30", "Meeting", "2026-10-05", "17:30"),
+            Case("Meeting @ 9.45", "Meeting", "2026-10-06", "09:45"),
+            Case("Pay 10.50 at 5pm", "Pay 10.50", "2026-10-05", "17:00"),
             Case("Pick up kids at 3:30", "Pick up kids", "2026-10-05", "15:30"),
             Case("Wake up at 06:30", "Wake up", "2026-10-06", "06:30"),
             Case("Read chapter 5 at 7", "Read chapter 5", "2026-10-06", "07:00"),
@@ -196,6 +204,9 @@ class WhenParserTest(private val case: Case) {
             Case("Buy 2 apples", "Buy 2 apples"),
             Case("Fix bug #12", "Fix bug #12"),
             Case("Pay 1.5k", "Pay 1.5k"),
+            // A dotted number without "at" is a price, and dots never separate a date
+            Case("Pay 10.50", "Pay 10.50"),
+            Case("Meet at 10.08.2026", "Meet at 10.08.2026"),
             Case("Visit Mars", "Visit Mars"),
         )
     }

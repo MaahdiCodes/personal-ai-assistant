@@ -30,6 +30,8 @@ data class ParsedTask(
  * - A time without a date means today, or tomorrow if that time has already passed.
  * - An hour without am/pm: 1-6 and 12 are afternoon, 7-11 morning ("at 5" = 17:00), unless a
  *   word like "morning" or "evening" says otherwise. "06:30" (leading zero) is taken as written.
+ * - Minutes follow a colon ("10:30") or a dot. A dot counts only with am/pm ("10.30 am") or after
+ *   a word like "at" ("at 10.30"), so "Pay 10.50" stays text.
  * - Numbers like 12/10 follow [dateOrder].
  */
 class WhenParser(
@@ -221,13 +223,16 @@ class WhenParser(
 
     // --- Times --------------------------------------------------------------------------------
 
-    private fun findTime(text: UnusedText, part: PartOfDay?): LocalTime? =
-        text.take(TIME_12_HOUR) { match ->
+    private fun findTime(text: UnusedText, part: PartOfDay?): LocalTime? {
+        val hourAndMinutes = { match: MatchResult -> guessTime(match.groupValues[1], match.int(2), part) }
+        return text.take(TIME_12_HOUR) { match ->
             twelveHourTime(match.int(1), match.groups[2]?.value?.toInt() ?: 0, isPm = match.groupValues[3].equals("p", ignoreCase = true))
         }
-            ?: text.take(TIME_WITH_MINUTES) { match -> guessTime(match.groupValues[1], match.int(2), part) }
+            ?: text.take(TIME_WITH_MINUTES, convert = hourAndMinutes)
+            ?: text.take(TIME_WITH_DOT, convert = hourAndMinutes)
             ?: text.take(BARE_HOUR) { match -> guessTime(match.groupValues[1], 0, part) }
             ?: text.take(NOON) { LocalTime.NOON }
+    }
 
     private fun guessTime(hourText: String, minute: Int, part: PartOfDay?): LocalTime? {
         val hour = hourText.toInt()
@@ -259,7 +264,12 @@ class WhenParser(
                 "jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec"
         const val ORDINAL = "(?:st|nd|rd|th)"
         const val DATE_PREFIX = "(?:(?:on|by|due|until|before)\\s+)?"
-        const val TIME_PREFIX = "(?:\\b(?:at|by|before|around|from)\\s+|@\\s*)?"
+        /** A word saying a time follows: "at", "by", "@" and so on. */
+        const val TIME_WORD = "(?:\\b(?:at|by|before|around|from)\\s+|@\\s*)"
+        const val TIME_PREFIX = "$TIME_WORD?"
+
+        /** Not inside a number: in "10.08 am", "08 am" alone must not be read as 8 am. */
+        const val NOT_INSIDE_NUMBER = "(?<![\\d.:])"
         const val TOMORROW_WORDS = "tomorrow|tmrw|tmr|tommorow|tomorow|tommorrow"
 
         fun pattern(regex: String) = Regex(regex, RegexOption.IGNORE_CASE)
@@ -302,8 +312,12 @@ class WhenParser(
         val WEEKDAY = pattern("\\b(?:(?:on|by|due|until|before|this|next)\\s+)?($WEEKDAY_FULL)\\b")
         val WEEKDAY_ABBREVIATED = pattern("\\b(?:on|by|due|until|before|this|next)\\s+($WEEKDAY_SHORT)\\b")
 
-        val TIME_12_HOUR = pattern("$TIME_PREFIX\\b(\\d{1,2})(?::([0-5]\\d))?\\s*([ap])\\.?m\\b\\.?")
+        val TIME_12_HOUR = pattern("$TIME_PREFIX$NOT_INSIDE_NUMBER\\b(\\d{1,2})(?:[:.]([0-5]\\d))?\\s*([ap])\\.?m\\b\\.?")
         val TIME_WITH_MINUTES = pattern("$TIME_PREFIX\\b(\\d{1,2}):([0-5]\\d)\\b")
+
+        // "at 10.30". Only after a time word, so a price like "Pay 10.50" stays text, and never
+        // followed by another dotted number, so a date like "10.08.2026" stays text too.
+        val TIME_WITH_DOT = pattern("$TIME_WORD(\\d{1,2})\\.([0-5]\\d)\\b(?![.:]\\d)")
         val BARE_HOUR = pattern(
             "(?:\\b(?:at|around)\\s+|@\\s*)(\\d{1,2})\\b(?!\\s*(?:[/:%.,]\\d|$ORDINAL\\b|" +
                 "(?:days?|weeks?|months?|years?|hours?|hrs?|mins?|minutes?|people|persons?|times)\\b))",
