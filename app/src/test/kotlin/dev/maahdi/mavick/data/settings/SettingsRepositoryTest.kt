@@ -84,6 +84,74 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `the calendar is off at first with no calendar chosen`() {
+        val settings = SettingsRepository(preferences).current
+
+        assertThat(settings.calendarEnabled).isFalse()
+        assertThat(settings.calendarId).isNull()
+        assertThat(settings.calendarName).isNull()
+        assertThat(settings.calendarTarget).isNull()
+    }
+
+    @Test
+    fun `the chosen calendar is saved and survives a restart`() {
+        SettingsRepository(preferences).update { it.copy(calendarEnabled = true, calendarId = 42, calendarName = "Personal (me@gmail.com)") }
+
+        val reloaded = SettingsRepository(preferences).current
+
+        assertThat(reloaded.calendarEnabled).isTrue()
+        assertThat(reloaded.calendarId).isEqualTo(42L)
+        assertThat(reloaded.calendarName).isEqualTo("Personal (me@gmail.com)")
+        assertThat(reloaded.calendarTarget).isEqualTo(42L)
+    }
+
+    @Test
+    fun `switching the calendar off keeps the choice but writes nowhere`() {
+        val repository = SettingsRepository(preferences)
+        repository.update { it.copy(calendarEnabled = true, calendarId = 42, calendarName = "Personal") }
+
+        repository.update { it.copy(calendarEnabled = false) }
+
+        val reloaded = SettingsRepository(preferences).current
+        assertThat(reloaded.calendarId).isEqualTo(42L)
+        assertThat(reloaded.calendarName).isEqualTo("Personal")
+        assertThat(reloaded.calendarTarget).isNull()
+    }
+
+    @Test
+    fun `the calendar cannot be on without a calendar chosen`() {
+        val repository = SettingsRepository(preferences)
+
+        repository.update { it.copy(calendarEnabled = true) }
+
+        assertThat(repository.current.calendarEnabled).isFalse()
+        assertThat(SettingsRepository(preferences).current.calendarEnabled).isFalse()
+    }
+
+    @Test
+    fun `forgetting the calendar clears what was saved`() {
+        val repository = SettingsRepository(preferences)
+        repository.update { it.copy(calendarEnabled = true, calendarId = 42, calendarName = "Personal") }
+
+        repository.update { it.copy(calendarEnabled = false, calendarId = null, calendarName = null) }
+
+        val reloaded = SettingsRepository(preferences).current
+        assertThat(reloaded.calendarId).isNull()
+        assertThat(reloaded.calendarName).isNull()
+    }
+
+    @Test
+    fun `a damaged calendar choice reads as no calendar`() {
+        preferences.edit().putBoolean("calendar_enabled", true).putString("calendar_id", "not a number").commit()
+        assertThat(SettingsRepository(preferences).current.calendarEnabled).isFalse()
+        assertThat(SettingsRepository(preferences).current.calendarId).isNull()
+
+        preferences.edit().putString("calendar_id", "-3").commit()
+        assertThat(SettingsRepository(preferences).current.calendarId).isNull()
+        assertThat(SettingsRepository(preferences).current.calendarEnabled).isFalse()
+    }
+
+    @Test
     fun `a pause until resumed survives a restart, and resuming clears it`() {
         val repository = SettingsRepository(preferences)
         repository.update { it.copy(capturePause = CapturePause.UntilResumed) }

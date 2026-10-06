@@ -47,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.maahdi.mavick.R
+import dev.maahdi.mavick.calendar.DeviceCalendar
 import dev.maahdi.mavick.capture.ReadingState
 import dev.maahdi.mavick.data.settings.AppSettings
 import dev.maahdi.mavick.health.StorageStatus
@@ -101,11 +102,17 @@ fun SettingsScreen(
     settings: AppSettings,
     health: HealthInfo,
     ai: AiSettingsState,
+    calendar: CalendarSettingsState,
     exportOutcome: ExportOutcome?,
     now: Instant,
     zone: ZoneId,
     use24Hour: Boolean,
     onChange: ((AppSettings) -> AppSettings) -> Unit,
+    onCalendarSwitch: (Boolean) -> Unit,
+    onChangeCalendar: () -> Unit,
+    onPickCalendar: (DeviceCalendar) -> Unit,
+    onClosePicker: () -> Unit,
+    onFixCalendarPermission: () -> Unit,
     onFixNotifications: () -> Unit,
     onFixBattery: () -> Unit,
     onFixNotificationAccess: () -> Unit,
@@ -217,6 +224,17 @@ fun SettingsScreen(
                 onRemoveModel = onRemoveModel,
                 onTurnModelOnAgain = onTurnModelOnAgain,
                 onExportMessages = onExportMessages,
+            )
+            HorizontalDivider()
+
+            CalendarSection(
+                settings = settings,
+                state = calendar,
+                onSwitch = onCalendarSwitch,
+                onChange = onChangeCalendar,
+                onPick = onPickCalendar,
+                onClosePicker = onClosePicker,
+                onFixPermission = onFixCalendarPermission,
             )
             HorizontalDivider()
 

@@ -1,9 +1,9 @@
-# Phone check: Phases 0 to 3
+# Phone check: Phases 0 to 4
 
 Do this on **each phone**. Sections 1–7 check Phases 0 + 1 (tasks and reminders): about 20
 minutes of hands-on time, plus some waiting for the long reminder tests (you can use the phone
 normally while you wait). Section 8 checks Phase 2 (reading messages), section 9 Phase 3
-(suggested tasks and the AI model).
+(suggested tasks and the AI model), section 10 Phase 4 (your calendar).
 
 Run the scripts from the project folder in PowerShell. Add `-Phone pixel` or `-Phone poco` when
 both phones are connected.
@@ -219,7 +219,7 @@ Still no internet: the model arrives as a file from the PC.
 
 ### Without a model first
 
-- [ ] Install the Phase 3 build: `.\scripts\install.ps1 -Phone pixel`. Settings shows version 0.4.0.
+- [ ] Install the Phase 3 build: `.\scripts\install.ps1 -Phone pixel`. Settings shows version 0.4.0 or newer.
 - [ ] Settings › Suggestions: **Suggest tasks from messages** is on, **AI model: None**.
 - [ ] From the other phone send `Can you pay the rent tomorrow at 10am?`. Within a minute the task
       list shows **"Mavick found 1 possible task in your messages"** and a quiet "1 suggested task to
@@ -277,4 +277,67 @@ Still no internet: the model arrives as a file from the PC.
 | Memory with the model loaded / a minute later | | |
 | Battery use over a day, warmth | | |
 | Accuracy check: precision / recall / seconds | | |
+| Problems seen | | |
+
+## 10. Phase 4: your calendar
+
+Mavick can now write tasks that have a **date and a time** into a calendar you choose, as 30-minute
+events, and keep them in step with the task. It is off until you switch it on. Mavick itself still
+has no internet; if the calendar you choose syncs with Google, the Calendar app uploads the event
+(its title and time). Part 1 is covered here; the clash warnings and the widget come with later parts.
+
+Use a **test calendar** for the first run if you can: in Google Calendar (on the web) make a
+calendar called *Mavick test*, which can show on the phone, and choose that one below. Delete it at
+the end.
+
+### Switching on
+
+- [ ] Install the Phase 4 build: `.\scripts\install.ps1 -Phone pixel`. Settings shows version 0.5.0.
+- [ ] Settings › Calendar: the switch is off. Nothing was asked at install.
+- [ ] Switch it on. Android asks for **Calendar** (both permissions in one prompt): allow. The list
+      of calendars appears, each with its account. Pick the test calendar.
+- [ ] Settings › Calendar now shows the calendar's name and "N tasks are in the calendar".
+- [ ] **Refuse** the permission instead (try it once, then allow in App info): Settings says the
+      calendar permission is off, with **Fix** opening Mavick's App info. Allowing it there and coming
+      back clears the message.
+
+### Following the task
+
+Do each step in Mavick, then open the Calendar app (or Google Calendar) and look.
+
+- [ ] Add `Call the bank today 5pm`: a 30-minute event "Call the bank" appears at 17:00. The event
+      shows no alarm of its own, and no notes. On a calendar shared with someone, it shows as private.
+- [ ] Edit the task's title and its time: the event changes (no second event).
+- [ ] Add `Pay rent tomorrow` (a date, no time): **no** event. Then give it a time: the event appears.
+- [ ] Mark the first task **Done**: its event disappears. **Undo** (or reopen from Done): it comes back.
+- [ ] Delete a task and undo the delete: the event goes and comes back.
+- [ ] A daily repeating task with a time: mark it done, and its event moves to the next day.
+- [ ] In the Calendar app, **delete** one of Mavick's events. Mavick does not put it back by itself.
+      Edit that task in Mavick (change the title): the event is written again.
+- [ ] Tasks overdue from before today are **not** copied when you switch on (only today and later).
+
+### Switching off, and changing calendar
+
+- [ ] Choose **Change** and pick another calendar: the events move there (gone from the first).
+- [ ] Switch the feature off: Mavick's events disappear from the calendar; your own events stay.
+- [ ] Switch it on again: the events come back.
+- [ ] With the feature on, turn the calendar permission off in App info and reopen Settings: it
+      says so. Mark a task done meanwhile, then allow the permission again and open Mavick: the stale
+      event is removed (the next restart, time change or morning alarm also tidies up).
+- [ ] Change the phone's time zone (Settings › System › Date & time), look at an event, change it
+      back: the event keeps the task's clock time (5 pm stays 5 pm).
+
+### Results (Phase 4, part 1)
+
+| Item | Pixel 7 Pro | Poco X7 Pro |
+|---|---|---|
+| Permission prompt, calendar list, picking a calendar | | |
+| Event appears, edits, done / undo, delete / undo, repeat | | |
+| Date-only task: no event; adding a time creates it | | |
+| Event deleted in Calendar app: stays gone until the task changes | | |
+| Change calendar, switch off and on | | |
+| Permission off: message, Fix, tidy-up after allowing | | |
+| Time zone change | | |
+| Events show as private, no alarm, no notes | | |
+| On-phone calendar tests pass (`test.ps1 -OnPhone`) | | |
 | Problems seen | | |

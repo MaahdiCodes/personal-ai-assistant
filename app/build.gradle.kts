@@ -26,8 +26,8 @@ android {
         applicationId = "dev.maahdi.mavick"
         minSdk = 33
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -184,6 +184,10 @@ val allowedPermissions = setOf(
     "android.permission.RECEIVE_BOOT_COMPLETED",
     // Phase 1: app lock with fingerprint or screen-lock PIN.
     "android.permission.USE_BIOMETRIC",
+    // Phase 4: write tasks that have a time to a calendar the user picks, and read calendars to
+    // choose one and to find clashes. Asked for when the user switches the feature on.
+    "android.permission.READ_CALENDAR",
+    "android.permission.WRITE_CALENDAR",
 )
 
 /**

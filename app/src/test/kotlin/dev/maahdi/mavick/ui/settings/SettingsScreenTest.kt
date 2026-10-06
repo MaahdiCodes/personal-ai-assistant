@@ -19,7 +19,9 @@ import dev.maahdi.mavick.ai.ModelInfo
 import dev.maahdi.mavick.capture.ReadingState
 import dev.maahdi.mavick.data.settings.AppSettings
 import dev.maahdi.mavick.health.StorageStatus
+import dev.maahdi.mavick.testing.PERSONAL_CALENDAR
 import dev.maahdi.mavick.testing.TEST_ZONE
+import dev.maahdi.mavick.testing.WORK_CALENDAR
 import java.time.Duration
 import java.time.Instant
 import org.junit.Rule
@@ -36,17 +38,28 @@ class SettingsScreenTest {
     private var settings = AppSettings()
     private val calls = mutableListOf<String>()
 
-    private fun show(health: HealthInfo, ai: AiSettingsState = AiSettingsState(), exportOutcome: ExportOutcome? = null) {
+    private fun show(
+        health: HealthInfo,
+        ai: AiSettingsState = AiSettingsState(),
+        exportOutcome: ExportOutcome? = null,
+        calendar: CalendarSettingsState = CalendarSettingsState(permissionGranted = true, loaded = true),
+    ) {
         compose.setContent {
             SettingsScreen(
                 settings = settings,
                 health = health,
                 ai = ai,
+                calendar = calendar,
                 exportOutcome = exportOutcome,
                 now = now,
                 zone = TEST_ZONE,
                 use24Hour = true,
                 onChange = { change -> settings = change(settings) },
+                onCalendarSwitch = { on -> calls += "calendar switch $on" },
+                onChangeCalendar = { calls += "calendar change" },
+                onPickCalendar = { calendar -> calls += "calendar pick ${calendar.id}" },
+                onClosePicker = { calls += "calendar close" },
+                onFixCalendarPermission = { calls += "calendar permission" },
                 onFixNotifications = { calls += "notifications" },
                 onFixBattery = { calls += "battery" },
                 onFixNotificationAccess = { calls += "access" },
@@ -285,6 +298,153 @@ class SettingsScreenTest {
     fun `a refused import says why`() {
         show(working, AiSettingsState(outcome = ModelOutcome.Rejected(ImportProblem.NOT_A_MODEL)))
         compose.onNodeWithText("That isn't a LiteRT-LM model (.litertlm).").performScrollTo().assertExists()
+    }
+
+    // --- Calendar ---
+
+    private val calendars = listOf(PERSONAL_CALENDAR, WORK_CALENDAR)
+
+    @Test
+    fun `the calendar switch starts off and asks to be turned on`() {
+        show(working)
+
+        compose.onNodeWithText("Add tasks with a time to my calendar").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("calendar switch true")
+        compose.onNodeWithText("Choose a calendar").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the calendar section says what goes to Google and what switching off does`() {
+        show(working)
+
+        compose.onNodeWithText("If the calendar syncs with Google, Google receives it through the Calendar app", substring = true)
+            .performScrollTo()
+            .assertExists()
+        compose.onNodeWithText("Switching this off removes the events Mavick added.", substring = true).assertExists()
+    }
+
+    @Test
+    fun `with the feature on the chosen calendar and the number of events show`() {
+        settings = settings.copy(calendarEnabled = true, calendarId = 1, calendarName = "Personal (me@example.com)")
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, calendars = calendars, loaded = true, eventCount = 3))
+
+        compose.onNodeWithText("Personal (me@example.com)").performScrollTo().assertExists()
+        compose.onNodeWithText("3 tasks are in the calendar").performScrollTo().assertExists()
+        compose.onNodeWithText("The calendar permission is off", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("The calendar you chose is not on this phone any more. Choose another.").assertDoesNotExist()
+    }
+
+    @Test
+    fun `one event is counted in the singular`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, loaded = true, eventCount = 1))
+
+        compose.onNodeWithText("1 task is in the calendar").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `the switch turns the feature off and Change opens the picker`() {
+        settings = settings.copy(calendarEnabled = true, calendarId = 1, calendarName = "Personal")
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, calendars = calendars, loaded = true))
+
+        compose.onNodeWithText("Change").performScrollTo().performClick()
+        compose.onNodeWithText("Add tasks with a time to my calendar").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("calendar change", "calendar switch false").inOrder()
+    }
+
+    @Test
+    fun `a lost permission is said and Fix opens Android's settings`() {
+        settings = settings.copy(calendarEnabled = true, calendarId = 1, calendarName = "Personal")
+        show(working, calendar = CalendarSettingsState(permissionGranted = false, loaded = true, eventCount = 2))
+
+        compose.onNodeWithText("The calendar permission is off", substring = true).performScrollTo().assertExists()
+        compose.onAllNodesWithText("Fix")[0].performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("calendar permission")
+    }
+
+    @Test
+    fun `a refused permission is said even though the feature is still off`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = false, permissionDenied = true))
+
+        compose.onNodeWithText("The calendar permission is off", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `events left behind without the permission are said even with the feature off`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = false, loaded = true, eventCount = 2))
+
+        compose.onNodeWithText("The calendar permission is off", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `with no permission asked for and no events nothing is said about it`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = false, loaded = true))
+
+        compose.onNodeWithText("The calendar permission is off", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a chosen calendar that is gone is said, and Change lets you pick another`() {
+        settings = settings.copy(calendarEnabled = true, calendarId = 9, calendarName = "Old calendar")
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, calendars = calendars, loaded = true))
+
+        compose.onNodeWithText("The calendar you chose is not on this phone any more. Choose another.").performScrollTo().assertExists()
+        compose.onAllNodesWithText("Change")[1].performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("calendar change")
+    }
+
+    @Test
+    fun `the calendar is not called gone before the list has loaded`() {
+        settings = settings.copy(calendarEnabled = true, calendarId = 9, calendarName = "Old calendar")
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, loaded = false))
+
+        compose.onNodeWithText("The calendar you chose is not on this phone any more. Choose another.").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the picker lists the calendars with their accounts and picking one says which`() {
+        settings = settings.copy(calendarEnabled = true, calendarId = 1, calendarName = "Personal")
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, calendars = calendars, loaded = true, picking = true))
+
+        compose.onNodeWithText("Choose a calendar").assertExists()
+        compose.onNodeWithText("me@example.com").assertExists()
+        compose.onNodeWithText("Work").performClick()
+
+        assertThat(calls).containsExactly("calendar pick 2")
+    }
+
+    @Test
+    fun `the picker says when no calendar can take events`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, loaded = true, picking = true))
+
+        compose.onNodeWithText("No calendar can take new events.", substring = true).assertExists()
+    }
+
+    @Test
+    fun `the picker says it is looking while the list loads`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, loaded = false, picking = true))
+
+        compose.onNodeWithText("Looking for calendars…").assertExists()
+    }
+
+    @Test
+    fun `cancelling the picker closes it`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, calendars = calendars, loaded = true, picking = true))
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        assertThat(calls).containsExactly("calendar close")
+    }
+
+    @Test
+    fun `while events are written the screen says so`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, loaded = true, working = true, eventCount = 4))
+
+        compose.onNodeWithText("Updating the calendar…").performScrollTo().assertExists()
+        compose.onNodeWithText("4 tasks are in the calendar").assertDoesNotExist()
     }
 
     @Test

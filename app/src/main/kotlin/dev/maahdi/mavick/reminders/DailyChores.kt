@@ -2,7 +2,8 @@ package dev.maahdi.mavick.reminders
 
 /**
  * Work that rides on Mavick's existing alarms instead of a background job of its own
- * (docs/PLAN.md §0.7): deleting old messages and checking that message reading still works.
+ * (docs/PLAN.md §0.7): deleting old messages, checking that message reading still works, and
+ * bringing the calendar events in line with the tasks.
  */
 interface DailyChores {
     /** Cheap clean-up that is fine at any time, including right after a restart. */

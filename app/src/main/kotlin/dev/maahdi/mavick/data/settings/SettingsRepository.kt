@@ -36,8 +36,16 @@ data class AppSettings(
     val defaultRulesAdded: Boolean = false,
     /** Look for tasks in new messages and suggest them (Phase 3). */
     val suggestionsEnabled: Boolean = true,
+    /** Write tasks that have a time to a phone calendar (Phase 4). Off until a calendar is chosen. */
+    val calendarEnabled: Boolean = false,
+    /** The chosen calendar's ID in the phone's calendar storage, and a name to show for it. */
+    val calendarId: Long? = null,
+    val calendarName: String? = null,
 ) {
     fun captureFor(app: SourceApp): AppCapture = appCapture[app] ?: AppCapture()
+
+    /** The calendar tasks are written to now, or null while the feature is off. */
+    val calendarTarget: Long? get() = calendarId.takeIf { calendarEnabled }
 
     companion object {
         const val DEFAULT_RETENTION_DAYS = 14
@@ -65,6 +73,8 @@ class SettingsRepository(private val preferences: SharedPreferences) {
         val updated = transformed.copy(
             messageRetentionDays = transformed.messageRetentionDays.coerceIn(AppSettings.RETENTION_DAYS_RANGE),
             readingWarningDays = transformed.readingWarningDays.coerceIn(AppSettings.WARNING_DAYS_RANGE),
+            // The calendar can't be on without a calendar to write to.
+            calendarEnabled = transformed.calendarEnabled && transformed.calendarId != null,
         )
         write(updated)
         state.value = updated
@@ -72,6 +82,8 @@ class SettingsRepository(private val preferences: SharedPreferences) {
 
     private fun read(): AppSettings {
         val defaults = AppSettings()
+        // Stored as text: a damaged or foreign value reads as "no calendar", never crashes.
+        val calendarId = preferences.getString(KEY_CALENDAR_ID, null)?.toLongOrNull()?.takeIf { it > 0 }
         return AppSettings(
             briefingEnabled = preferences.getBoolean(KEY_BRIEFING_ENABLED, defaults.briefingEnabled),
             briefingTime = preferences.getString(KEY_BRIEFING_TIME, null)
@@ -96,6 +108,9 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             xiaomiAutostartOn = preferences.getBoolean(KEY_XIAOMI_AUTOSTART, false),
             defaultRulesAdded = preferences.getBoolean(KEY_DEFAULT_RULES_ADDED, false),
             suggestionsEnabled = preferences.getBoolean(KEY_SUGGESTIONS_ENABLED, defaults.suggestionsEnabled),
+            calendarEnabled = calendarId != null && preferences.getBoolean(KEY_CALENDAR_ENABLED, defaults.calendarEnabled),
+            calendarId = calendarId,
+            calendarName = preferences.getString(KEY_CALENDAR_NAME, null),
         )
     }
 
@@ -122,6 +137,9 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             putBoolean(KEY_XIAOMI_AUTOSTART, settings.xiaomiAutostartOn)
             putBoolean(KEY_DEFAULT_RULES_ADDED, settings.defaultRulesAdded)
             putBoolean(KEY_SUGGESTIONS_ENABLED, settings.suggestionsEnabled)
+            putBoolean(KEY_CALENDAR_ENABLED, settings.calendarEnabled)
+            if (settings.calendarId == null) remove(KEY_CALENDAR_ID) else putString(KEY_CALENDAR_ID, settings.calendarId.toString())
+            if (settings.calendarName == null) remove(KEY_CALENDAR_NAME) else putString(KEY_CALENDAR_NAME, settings.calendarName)
         }
     }
 
@@ -166,5 +184,8 @@ class SettingsRepository(private val preferences: SharedPreferences) {
         private const val KEY_XIAOMI_AUTOSTART = "xiaomi_autostart_on"
         private const val KEY_DEFAULT_RULES_ADDED = "default_rules_added"
         private const val KEY_SUGGESTIONS_ENABLED = "suggestions_enabled"
+        private const val KEY_CALENDAR_ENABLED = "calendar_enabled"
+        private const val KEY_CALENDAR_ID = "calendar_id"
+        private const val KEY_CALENDAR_NAME = "calendar_name"
     }
 }

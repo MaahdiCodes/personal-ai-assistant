@@ -6,6 +6,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import dev.maahdi.mavick.data.calendar.CalendarLinkDao
+import dev.maahdi.mavick.data.calendar.CalendarLinkEntity
 import dev.maahdi.mavick.data.health.HealthEventDao
 import dev.maahdi.mavick.data.health.HealthEventEntity
 import dev.maahdi.mavick.data.message.MessageDao
@@ -25,12 +27,25 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  * 2. Phase 1: reminder time, repeat rule, completion time.
  * 3. Phase 2: messages read from notifications, the rules about what to read, listener health.
  * 4. Phase 3: suggestions found in messages (deleted together with their message).
+ * 5. Phase 4: the calendar event written for each task (this phone only).
  */
 @Database(
-    entities = [TaskEntity::class, MessageEntity::class, ExclusionRuleEntity::class, HealthEventEntity::class, SuggestionEntity::class],
-    version = 4,
+    entities = [
+        TaskEntity::class,
+        MessageEntity::class,
+        ExclusionRuleEntity::class,
+        HealthEventEntity::class,
+        SuggestionEntity::class,
+        CalendarLinkEntity::class,
+    ],
+    version = 5,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2),
+        AutoMigration(from = 2, to = 3),
+        AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5),
+    ],
 )
 @TypeConverters(Converters::class)
 abstract class MavickDatabase : RoomDatabase() {
@@ -43,6 +58,8 @@ abstract class MavickDatabase : RoomDatabase() {
     abstract fun healthEventDao(): HealthEventDao
 
     abstract fun suggestionDao(): SuggestionDao
+
+    abstract fun calendarLinkDao(): CalendarLinkDao
 
     companion object {
         const val FILE_NAME = "mavick.db"

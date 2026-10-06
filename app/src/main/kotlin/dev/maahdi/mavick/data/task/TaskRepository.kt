@@ -1,5 +1,6 @@
 package dev.maahdi.mavick.data.task
 
+import dev.maahdi.mavick.calendar.TaskCalendar
 import dev.maahdi.mavick.reminders.ReminderScheduler
 import java.time.Clock
 import java.time.Instant
@@ -23,6 +24,9 @@ data class Briefing(val overdue: List<TaskEntity>, val today: List<TaskEntity>, 
  * Changes are serialized with a lock: a notification button and the app screen changing the same
  * task at the same moment can't overwrite each other.
  *
+ * After a change is saved, [calendar] is told so the task's calendar event follows (Phase 4). That
+ * happens after the lock is released, and a calendar problem never undoes or fails a change.
+ *
  * @param clock gives the current clock each time, so a time-zone change is picked up immediately.
  */
 class TaskRepository(
@@ -30,6 +34,7 @@ class TaskRepository(
     private val scheduler: ReminderScheduler,
     private val clock: () -> Clock,
     private val newId: () -> String = { UUID.randomUUID().toString() },
+    private val calendar: TaskCalendar = TaskCalendar.NONE,
 ) {
     private val lock = Mutex()
 
@@ -40,28 +45,32 @@ class TaskRepository(
     suspend fun find(id: String): TaskEntity? = dao.findById(id)?.takeIf { it.deletedAt == null }
 
     /** @throws IllegalArgumentException if the draft's title is blank. */
-    suspend fun create(draft: TaskDraft): TaskEntity = lock.withLock {
-        val now = now()
-        val clean = draft.normalized(now.toLocalDate())
-        val stamp = stamp()
-        val task = TaskEntity(
-            id = newId(),
-            title = clean.title,
-            notes = clean.notes,
-            dueDate = clean.dueDate,
-            dueTime = clean.dueTime,
-            remindAt = pendingReminder(clean.dueDate, clean.reminderTime, now),
-            priority = clean.priority,
-            source = clean.source,
-            sourceExcerpt = clean.sourceExcerpt,
-            createdAt = stamp,
-            updatedAt = stamp,
-            reminderTime = clean.reminderTime,
-            repeatRule = clean.repeatRule,
-        )
-        dao.insert(task)
-        syncAlarm(task)
-        task
+    suspend fun create(draft: TaskDraft): TaskEntity {
+        val task = lock.withLock {
+            val now = now()
+            val clean = draft.normalized(now.toLocalDate())
+            val stamp = stamp()
+            val task = TaskEntity(
+                id = newId(),
+                title = clean.title,
+                notes = clean.notes,
+                dueDate = clean.dueDate,
+                dueTime = clean.dueTime,
+                remindAt = pendingReminder(clean.dueDate, clean.reminderTime, now),
+                priority = clean.priority,
+                source = clean.source,
+                sourceExcerpt = clean.sourceExcerpt,
+                createdAt = stamp,
+                updatedAt = stamp,
+                reminderTime = clean.reminderTime,
+                repeatRule = clean.repeatRule,
+            )
+            dao.insert(task)
+            syncAlarm(task)
+            task
+        }
+        calendar.taskChanged(task.id)
+        return task
     }
 
     /**
@@ -122,10 +131,13 @@ class TaskRepository(
     }
 
     /** Undo: puts back an earlier copy of a task, exactly as it was (except a reminder already past). */
-    suspend fun restore(snapshot: TaskEntity) = lock.withLock {
-        val restored = snapshot.copy(remindAt = snapshot.remindAt?.takeIf { it.isAfter(now()) }, updatedAt = stamp())
-        dao.upsert(restored)
-        syncAlarm(restored)
+    suspend fun restore(snapshot: TaskEntity) {
+        lock.withLock {
+            val restored = snapshot.copy(remindAt = snapshot.remindAt?.takeIf { it.isAfter(now()) }, updatedAt = stamp())
+            dao.upsert(restored)
+            syncAlarm(restored)
+        }
+        calendar.taskChanged(snapshot.id)
     }
 
     suspend fun snooze(id: String, minutes: Long): TaskEntity? = mutate(id) { task, now, stamp ->
@@ -195,12 +207,16 @@ class TaskRepository(
     private suspend fun mutate(
         id: String,
         change: (task: TaskEntity, now: LocalDateTime, stamp: Instant) -> TaskEntity?,
-    ): TaskEntity? = lock.withLock {
-        val task = dao.findById(id)?.takeIf { it.deletedAt == null } ?: return null
-        val updated = change(task, now(), stamp()) ?: return task
-        dao.update(updated)
-        syncAlarm(updated)
-        updated
+    ): TaskEntity? {
+        val updated = lock.withLock {
+            val task = dao.findById(id)?.takeIf { it.deletedAt == null } ?: return null
+            val updated = change(task, now(), stamp()) ?: return task
+            dao.update(updated)
+            syncAlarm(updated)
+            updated
+        }
+        calendar.taskChanged(id)
+        return updated
     }
 
     private fun syncAlarm(task: TaskEntity) {

@@ -58,6 +58,10 @@ interface TaskDao {
     )
     suspend fun getOpenDueOnOrBefore(date: LocalDate): List<TaskEntity>
 
+    /** Open tasks with both a date and a time: the ones that get a calendar event (Phase 4). */
+    @Query("SELECT * FROM task WHERE status = 'OPEN' AND deletedAt IS NULL AND dueDate IS NOT NULL AND dueTime IS NOT NULL")
+    suspend fun getOpenTimed(): List<TaskEntity>
+
     @Query("SELECT COUNT(*) FROM task WHERE deletedAt IS NULL")
     suspend fun countActive(): Int
 

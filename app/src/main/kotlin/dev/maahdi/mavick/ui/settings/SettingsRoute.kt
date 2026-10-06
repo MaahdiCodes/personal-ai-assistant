@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.maahdi.mavick.AppContainer
 import dev.maahdi.mavick.R
+import dev.maahdi.mavick.calendar.CalendarPermissions
 import dev.maahdi.mavick.capture.ListenerRestart
 import dev.maahdi.mavick.capture.ReadingHealth
 import dev.maahdi.mavick.data.health.HealthEventType
@@ -56,6 +57,8 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val aiViewModel: AiSettingsViewModel = viewModel(factory = AiSettingsViewModel.factory(container))
     val ai by aiViewModel.state.collectAsStateWithLifecycle()
+    val calendarViewModel: CalendarSettingsViewModel = viewModel(factory = CalendarSettingsViewModel.factory(container))
+    val calendar by calendarViewModel.state.collectAsStateWithLifecycle()
     var health by remember { mutableStateOf(readHealth(context, container)) }
     var storage by remember { mutableStateOf<StorageStatus>(StorageStatus.Checking) }
     var disconnects by remember { mutableIntStateOf(0) }
@@ -66,6 +69,8 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
         // Re-read when coming back from Android's settings, where the user may have fixed something.
         health = readHealth(context, container)
         aiViewModel.refresh()
+        // The permission may have been changed in Android's settings.
+        calendarViewModel.refresh()
         onPauseOrDispose { }
     }
     LaunchedEffect(Unit) {
@@ -79,6 +84,9 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
     val saveExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) scope.launch { exportOutcome = writeAccuracyExport(container, context, uri) }
     }
+    val requestCalendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        calendarViewModel.onPermissionResult(results.isNotEmpty() && results.values.all { it })
+    }
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val file = PickedFile.from(context.contentResolver, uri)
@@ -91,10 +99,23 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
         settings = settings,
         health = health.copy(storage = storage, disconnectsThisWeek = disconnects),
         ai = ai,
+        calendar = calendar,
         exportOutcome = exportOutcome,
         now = Instant.now(container.clock()),
         zone = container.clock().zone,
         use24Hour = DateFormat.is24HourFormat(context),
+        onCalendarSwitch = { on ->
+            when {
+                !on -> calendarViewModel.turnOff()
+                calendar.permissionGranted -> calendarViewModel.openPicker()
+                else -> requestCalendarPermission.launch(CalendarPermissions.REQUIRED)
+            }
+        },
+        onChangeCalendar = { calendarViewModel.openPicker() },
+        onPickCalendar = calendarViewModel::choose,
+        onClosePicker = calendarViewModel::closePicker,
+        // Android stops asking after a refusal or two, so send the user to where it can be allowed.
+        onFixCalendarPermission = { PhoneSettings.open(context, PhoneSettings.appInfo(context)) },
         onChange = { change: (AppSettings) -> AppSettings ->
             val wasSuggesting = container.settings.current.suggestionsEnabled
             container.settings.update(change)

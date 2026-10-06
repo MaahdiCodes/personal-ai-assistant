@@ -147,6 +147,35 @@ class MigrationTest {
         assertThat(suggestionCount).isEqualTo(0)
     }
 
+    @Test
+    fun `Phase 3 tasks and suggestions survive the upgrade to version 5, which adds an empty calendar link table`() {
+        helper.createDatabase(4).apply {
+            execSQL(
+                """
+                INSERT INTO task (id, title, notes, dueDate, dueTime, remindAt, priority, status, source,
+                                  sourceExcerpt, createdAt, updatedAt, deletedAt, reminderTime, repeatRule, completedAt)
+                VALUES ('t4', 'Send the form', NULL, '2026-10-08', '17:00', NULL, 'NORMAL',
+                        'OPEN', 'MANUAL', NULL, 1000, 2000, NULL, NULL, NULL, NULL)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(5).close()
+
+        val database = Room.databaseBuilder(context, MavickDatabase::class.java, databaseFile.absolutePath)
+            .allowMainThreadQueries()
+            .build()
+        val task = runBlocking { database.taskDao().findById("t4") }!!
+        val links = runBlocking { database.calendarLinkDao().all() }
+        database.close()
+
+        assertThat(task.title).isEqualTo("Send the form")
+        assertThat(task.dueTime).isEqualTo(LocalTime.of(17, 0))
+        // No event has been written yet: the first reconcile after switching the feature on does that.
+        assertThat(links).isEmpty()
+    }
+
     private companion object {
         const val DATABASE_NAME = "migration-test.db"
     }

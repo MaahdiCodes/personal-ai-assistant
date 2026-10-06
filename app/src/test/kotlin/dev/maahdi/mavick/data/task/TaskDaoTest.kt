@@ -115,6 +115,19 @@ class TaskDaoTest {
     }
 
     @Test
+    fun `timed tasks are the open ones with both a date and a time`() = runTest {
+        val timed = task(title = "timed", dueDate = LocalDate.of(2026, 10, 8), dueTime = LocalTime.of(17, 0))
+        dao.insert(timed)
+        dao.insert(task(title = "date only", dueDate = LocalDate.of(2026, 10, 8)))
+        dao.insert(task(title = "undated"))
+        dao.insert(task(title = "done", dueDate = LocalDate.of(2026, 10, 8), dueTime = LocalTime.of(9, 0), status = TaskStatus.DONE))
+        dao.insert(task(title = "archived", dueDate = LocalDate.of(2026, 10, 8), dueTime = LocalTime.of(9, 0), status = TaskStatus.ARCHIVED))
+        dao.insert(task(title = "deleted", dueDate = LocalDate.of(2026, 10, 8), dueTime = LocalTime.of(9, 0), deletedAt = TEST_NOW))
+
+        assertThat(dao.getOpenTimed()).containsExactly(timed)
+    }
+
+    @Test
     fun `count includes done tasks but not deleted ones`() = runTest {
         dao.insert(task())
         dao.insert(task(status = TaskStatus.DONE))
