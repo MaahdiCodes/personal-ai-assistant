@@ -45,6 +45,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
   - Release APK 25.6 MB: the budget was raised from 8 to 30 MB on purpose, for the AI runtime's 21.5 MB of native code (§10). R8 keep rules cover its JNI classes; kotlin-reflect is excluded. Whether R8 left the runtime working can only be seen on a phone: import the model in the release app and press Check.
   - The Part 1 commit message says 645 tests; it was 642 at that point.
 - **Versions:** app `versionCode 4`, `versionName 0.4.0`; database version 4.
+- **First phone test (Pixel 7 Pro, 2026-10-06):** the Gemma 3 1B model copied with `push-model.ps1` (SHA-256 matched) and imported in Settings. Two test messages each made a suggestion. Found: a suggestion's title copied the message's wording and ran on ("…is mentioned"), and the time in the title didn't match the sent text, so check the due time on the card. Not yet diagnosed; the accuracy check (eval/README.md) is the place to measure it. Do not change the prompt until the user has checked the due times.
 
 ### 0.2 Waiting on the user
 
@@ -192,6 +193,12 @@ CLAUDE.md                       Short pointer to this section for AI coding sess
 - **Priorities, in order:** free; private (messages never leave the phone); light on the phone (storage, CPU and battery, "the phone must never hang").
 - **Phones:** Pixel 7 Pro (12 GB RAM) and Poco X7 Pro (12 GB RAM, HyperOS). Both are daily phones with different accounts, and each has several WhatsApp accounts. Time zone Asia/Dhaka. Messages are mostly English. The work week is Sunday to Thursday, but the assistant must work every day. Writes times with a dot ("10.08 AM").
 - **PC:** Windows 11, PowerShell 5.1 (execution policy RemoteSigned), Git Bash available. Android Studio is at `S:\Programming\Android Studio`.
+
+### 0.10 Working on another PC or laptop
+
+- Pull `develop`, run `.\scripts\sync-memory.ps1` (copies the assistant's notes from `docs/agent-memory` into its local memory folder), then follow [docs/SETUP_NEW_PC.md](SETUP_NEW_PC.md).
+- **Not in git, by design:** the signing key, `keystore.properties`, the AI model (`*.litertlm`, re-download), real messages (`eval/private`, `recordings`), Hugging Face tokens.
+- Keep the notes current: at each phase end, update the notes and copy them to `docs/agent-memory` as well as this plan (see `feedback_mavick_update_memory_every_phase.md`).
 
 ---
 
