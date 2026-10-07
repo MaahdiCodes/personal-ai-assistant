@@ -1,8 +1,8 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phases 0–3 are coded. **Phase 4 (calendar) is coded** (tasks to the calendar, clash warnings, widget and tile), and **the core of Phase 5 (encrypted backup and restore with merge)** is coded. 1,081 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far; no phase has had its full phone check yet, and Phases 4 and 5 have not run on a phone.
-> **Last updated:** 2026-10-07, after building the Phase 5 backup core.
-> **Next step:** keyword search ("ask my assistant"), then the Phase 6 merge core. After that everything left needs a phone. The user installs 0.5.0, runs the phone checks (PHONE_CHECKLIST.md, sections 9, 10 and 11), imports the Gemma 3 1B model if not done, and fixes follow → accuracy check on real labelled messages (eval/README.md) → tags.
+> **Status:** Phases 0–3 are coded. **Phase 4 (calendar) is coded** (tasks to the calendar, clash warnings, widget and tile), and **the core of Phase 5 (encrypted backup and restore with merge)** is coded. 1,081 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far. **The on-phone automated test suite (`test.ps1 -OnPhone`) now also passes on the Pixel (2026-10-07)**, including `CalendarGatewayDeviceTest` (Phase 4), run for the first time; no phase has had its full **manual** phone check yet (PHONE_CHECKLIST.md).
+> **Last updated:** 2026-10-07, after the first `test.ps1 -OnPhone` run on the Pixel.
+> **Next step:** the user works through PHONE_CHECKLIST.md sections 10 and 11 by hand on the Pixel (calendar, clashes, widget, tile, then backup and restore) and reports the results tables. Then: keyword search ("ask my assistant"), the Phase 6 merge core, imports the Gemma 3 1B model if not done, accuracy check on real labelled messages (eval/README.md), tags.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
 
@@ -70,13 +70,14 @@ This document is the single source of truth for the project. **§0 is the hand-o
   - Not built (needs a phone): whether Drive accepts automatic weekly overwrites, so there is no automatic backup and no weekly reminder yet; "Last backup: N days ago" shows in Settings.
 - **Versions:** app `versionCode 5`, `versionName 0.5.0`; database version 5.
 - **First phone test (Pixel 7 Pro, 2026-10-06):** the Gemma 3 1B model copied with `push-model.ps1` (SHA-256 matched) and imported in Settings. Two test messages each made a suggestion. Found: a suggestion's title copied the message's wording and ran on ("…is mentioned"), and the time in the title didn't match the sent text, so check the due time on the card. Not yet diagnosed; the accuracy check (eval/README.md) is the place to measure it. Do not change the prompt until the user has checked the due times.
+- **First `test.ps1 -OnPhone` run (Pixel 7 Pro, 2026-10-07):** `install.ps1 -Phone pixel` (0.5.0) and `test.ps1 -OnPhone -Phone pixel` both ran clean. All 1,081 PC tests, Lint, and the permission and read-only checks passed; on the phone, 22 instrumented tests passed, including `EncryptedDatabaseTest`, `AndroidKeystoreKeyWrapperTest`, `ReminderDeliveryTest`, `MessageCaptureDeviceTest` and **`CalendarGatewayDeviceTest`** (all run for the first time). 2 tests skipped as expected (`ExtractionEvalRun`, `LiteRtLmDeviceTest`: no AI model imported yet). Along the way, found and fixed a genuine flaky PC test: `TasksViewModelTest`'s "a new task is checked as soon as it is added" used a plain `mutableListOf` read on the test thread while Room's own query executor thread wrote to it from `findClashes`, occasionally throwing `ConcurrentModificationException`; switched it to a `CopyOnWriteArrayList`. Unrelated to device testing, but `test.ps1` must pass before anything else runs. Sections 10 and 11 of PHONE_CHECKLIST.md (the manual calendar, clash, widget, tile, backup and restore walkthrough) still need the user's own hands on the phone — Mavick blocks screenshots of itself, so there is no way to drive or verify that part from here.
 
 ### 0.2 Waiting on the user
 
-1. **Install the current build (0.5.0)** on the Pixel: `.\scripts\install.ps1 -Phone pixel`. Then Settings › Health › Notification access › **Fix**. If Android says "Restricted setting": App info › ⋮ › *Allow restricted settings*, then try again.
+1. ~~Install the current build (0.5.0) on the Pixel~~ (done 2026-10-07). Settings › Health › Notification access › **Fix** still needs doing. If Android says "Restricted setting": App info › ⋮ › *Allow restricted settings*, then try again.
 2. **Recorder session** (the planned first step of Phase 2, now possible): install the debug app with `.\scripts\install.ps1 -DebugBuild -Phone pixel` and give **Mavick Debug** notification access too. Run `.\scripts\record-notifications.ps1 -Phone pixel -Start`. Send **fake** test messages from the other phone to every WhatsApp account, Messenger and Gmail, including long ones (about 300, 1,500 and 5,000 characters), then run `-Stop` and give Claude the `recordings` folder. This confirms the parsers and shows where WhatsApp names the account.
 3. **Open question 1 (§10):** how the several WhatsApp accounts are set up on each phone (WhatsApp's own "Add account", WhatsApp Business, or a clone such as Xiaomi "Dual apps").
-4. **Phone checks** on **both** phones: Phases 0–5 ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md); section 9 is Phase 3, section 10 is Phase 4 (calendar, clashes, widget, tile), section 11 is Phase 5 (backup)); share the filled-in results tables. For the calendar, use a throwaway test calendar first, and run `.\scripts\test.ps1 -OnPhone -Phone pixel` (it includes `CalendarGatewayDeviceTest`, which has never run).
+4. **Phone checks** on **both** phones: Phases 0–5 ([PHONE_CHECKLIST.md](PHONE_CHECKLIST.md); section 9 is Phase 3, section 10 is Phase 4 (calendar, clashes, widget, tile), section 11 is Phase 5 (backup)); share the filled-in results tables. For the calendar, use a throwaway test calendar first. `.\scripts\test.ps1 -OnPhone -Phone pixel` has now run clean on the Pixel (§0.1, 2026-10-07), including `CalendarGatewayDeviceTest` — sections 10 and 11 are the manual walkthrough on top of that, which still needs doing by hand.
 5. **AI model:** download `gemma3-1b-it-int4.litertlm` from https://huggingface.co/litert-community/Gemma3-1B-IT (accept the Gemma terms), then `.\scripts\push-model.ps1` (checklist §9).
 6. **Accuracy check:** export, label 100–200 messages, run `.\scripts\eval.ps1` ([eval/README.md](../eval/README.md)); share only `report.txt`.
 7. **Signing key backup:** the key exists (`keystore.properties`, git-ignored); make sure the `.p12` file is in Google Drive and on a USB drive, and the password is stored elsewhere (§5.7 B).
@@ -701,7 +702,7 @@ Times assume part-time work, with Claude writing most of the code.
 | Release manifest | ✅ 0 services. Emoji-font loader and Room's cross-process service removed. |
 | Your signing key | ⏳ Run `.\scripts\new-signing-key.ps1`, then back it up (§5.7 B) |
 | Install on both phones | ⏳ `.\scripts\install.ps1` |
-| On-phone tests (real encryption hardware) | ⏳ `.\scripts\test.ps1 -OnPhone` |
+| On-phone tests (real encryption hardware) | ✅ Ran on the Pixel 2026-10-07: `EncryptedDatabaseTest`, `AndroidKeystoreKeyWrapperTest` pass |
 | Usage measured on both phones | ⏳ `.\scripts\usage.ps1`. Record the numbers here. |
 
 **Phase 1 progress (2026-10-05)**
@@ -720,7 +721,7 @@ Times assume part-time work, with Claude writing most of the code.
 | Release APK | ✅ 4.5 MB (budget 8 MB). Permissions: notifications, exact alarms, restart, fingerprint, nothing else. 0 services. |
 | First use on the Pixel: "10.08 AM" read as 8 AM | ✅ Fixed 2026-10-05: dotted times ("10.08 AM", "at 10.30") understood; "Pay 10.50" and "10.08.2026" stay text. 9 new phrase tests. |
 | Pre-install safety audit (accounts, phone, scripts, merged manifest) | ✅ 2026-10-05 (§0.1). Fixed: Fix buttons fall back to App info instead of crashing; styled shared text accepted. Checklist: Poco test switch, time-zone wording, turning developer settings off. |
-| On-phone end-to-end reminder test | ⏳ Written (`ReminderDeliveryTest`). Runs with `.\scripts\test.ps1 -OnPhone`. |
+| On-phone end-to-end reminder test | ✅ `ReminderDeliveryTest` ran on the Pixel 2026-10-07, passed |
 | Phone check on both phones | ⏳ [PHONE_CHECKLIST.md](PHONE_CHECKLIST.md) |
 
 **Phase 2 progress (2026-10-05)**
@@ -733,7 +734,7 @@ Times assume part-time work, with Claude writing most of the code.
 | Accounts: Android user (clones), Gmail address, WhatsApp Business | ✅ Built. ⏳ WhatsApp's own account switcher: waiting on the recordings. |
 | Noise filter, dedup, too-old messages | ✅ Built |
 | Rules: account / chat / person / keyword, "Never read" and "Only read", app switches, pause, defaults | ✅ Built. 16 engine tests over every type, scope, mode and pause. |
-| "Excluded text never stored" guarantee | ✅ Proved on the PC (`MessageCaptureTest`). ⏳ On the phone: `MessageCaptureDeviceTest` (written, runs with `test.ps1 -OnPhone`). |
+| "Excluded text never stored" guarantee | ✅ Proved on the PC (`MessageCaptureTest`) and on the phone: `MessageCaptureDeviceTest` ran on the Pixel 2026-10-07, passed |
 | Encrypted `message`, `exclusion_rule`, `health_event` tables (database version 3) | ✅ Built. Migration test shows Phase 1 tasks are kept. |
 | Inbox, one message ("Add as task", "Never read this chat"), What Mavick reads | ✅ Built, with Compose UI tests |
 | Long messages: whole text from AndroidX apps, "Cut short" marker, Gmail preview note, "Add to Mavick" on selected text | ✅ Built. ⏳ Where real apps cut: recordings. |
@@ -780,7 +781,7 @@ Times assume part-time work, with Claude writing most of the code.
 | Settings › Calendar: permission prompt, calendar picker, "Fix", calendar gone, event count | ✅ Built, with Compose UI and view-model tests |
 | Database version 5 (`calendar_link`), migration test | ✅ |
 | Calendar tidy-up on the existing wake-ups (restart, time-zone change, daily alarm) | ✅ No new alarm, job or service |
-| On-phone test against the real calendar storage (`CalendarGatewayDeviceTest`) | ⏳ Written, compiles, never run |
+| On-phone test against the real calendar storage (`CalendarGatewayDeviceTest`) | ✅ Ran on the Pixel 2026-10-07, passed (its first run) |
 | Part 1 on the phones (events appear in Google Calendar; checklist §10) | ⏳ |
 | Part 2: clashes in the briefing, on the task list and in the editor; Settings switch and calendar choice | ✅ Built and tested on the PC (overlap rules, the calendar read against a fake provider, the briefing, the notification, the list, the editor, Settings) |
 | Part 2 on the phones (checklist §10) | ⏳ |

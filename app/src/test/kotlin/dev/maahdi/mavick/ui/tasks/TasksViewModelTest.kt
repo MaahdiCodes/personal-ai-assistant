@@ -154,7 +154,10 @@ class TasksViewModelTest {
 
     @Test
     fun `a new task is checked as soon as it is added`() = runTest {
-        val checked = mutableListOf<Int>()
+        // Room's Flow emits from its own query executor thread, not this test's dispatcher, so
+        // findClashes below can run concurrently with the assertion: a plain list here is a rare
+        // ConcurrentModificationException waiting to happen.
+        val checked = java.util.concurrent.CopyOnWriteArrayList<Int>()
         val viewModel = viewModel { found -> checked += found.size; emptyMap() }
         backgroundScope.launch { viewModel.state.collect {} }
         viewModel.state.first { !it.loading }
