@@ -1,12 +1,16 @@
 ---
 name: mavick-update-memory-every-phase
-description: The user wants Mavick's memory kept current at the end of every phase or piece of work, and copied into git so it travels to other PCs
+description: "After every piece of Mavick work (not only each phase), update docs/PLAN.md and the memory, copy memory into docs/agent-memory, commit and push, so any other device finds the current state"
 metadata:
+  node_type: memory
   type: feedback
+  originSessionId: ddd8a6d4-1d96-4101-96d8-89e10b16230f
+  modified: 2026-10-07T00:04:20.228Z
 ---
 
-At the end of each phase or significant piece of Mavick work, update the memory files too, not only docs/PLAN.md and the commit.
+After each finished piece of Mavick work (a part of a phase, a fix, a decision), update docs/PLAN.md, update the memory files, copy them to `docs/agent-memory/` in the repo, then commit and push `develop` (and fast-forward `main`). Do not wait for the end of a phase.
 
-**Why:** the user asked (2026-10-06) "is everything updated in memory? save in memory so that memory is updated every time." Memory had been left empty and out of date, so a new session would start from the wrong state. The user also works on other PCs, so the memory must also be in git.
+**Why:** the user asked (2026-10-06) "save in memory so that memory is updated every time", and again (2026-10-07) "once done something, must update plan/memory and update git so that I can always find it on another device". They work on more than one PC, and a stale memory or unpushed work means a new session starts from the wrong state.
 
-**How to apply:** at the end of each phase, after the plan (section 0, sections 7 and 10) and the commit/push: update the memory files in the local memory folder, then copy the same files to `docs/agent-memory/` in the repo, commit and push. Remove or correct anything that became wrong. Don't copy the plan into memory; point to it.
+**How to apply:** at the end of each piece of work: (1) `.\scripts\test.ps1` passes; (2) PLAN.md section 0 and the section 7 tables, and section 10 for decisions; (3) update the local memory files, then copy them to `docs/agent-memory/`; (4) commit and push `develop`, fast-forward `main`, push; (5) check `git status` is clean and nothing is ahead of origin. Remove or correct anything that became wrong. Don't copy the plan into memory; point to it.
+Related: [[mavick-phase-status]]

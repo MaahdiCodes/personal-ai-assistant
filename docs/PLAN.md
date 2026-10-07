@@ -70,7 +70,14 @@ This document is the single source of truth for the project. **§0 is the hand-o
 3. **Tags:** `phase-1`, then `phase-2`, on `main`, and push them.
 4. **Phase 3 on the phone:** fix what the checks find. First suspects: R8 in the release build, test apps reading `/data/local/tmp`, constrained JSON with Gemma 3 1B. Tune the prompt and prefilter with the accuracy report until precision ≥ 85% and recall ≥ 70%, then tag `phase-3`. (Phase 4 was started before this, at the user's request, §10; auto-add stays out until these numbers are good.)
 5. **Phase 4 part 2: clashes** (§5.9): read the calendar's events for a day, find timed tasks that overlap, a line in the briefing and a warning on the task. Then **part 3: widget and Quick Settings tile** (the widget shows titles, with a setting to hide them). Phone-check results for part 1 may change the design of these: look at them first.
-6. After each step, update this document (§0 and the §7 tables) and push `develop`.
+**Work that needs no phone** (the user wants these finished before the phone checks, 2026-10-07), in this order:
+   1. Phase 4 part 2: clashes (§5.9).
+   2. Phase 4 part 3: widget and Quick Settings tile (§5.9).
+   3. Phase 5, the PC-testable core: the encrypted backup file (AES-256-GCM, password-derived key) and restore with merge by task UUID, newest `updatedAt` wins (§5.7 A). This is also the Phase 6 merge code. Whether Drive accepts background overwrites needs a phone, so it stays out.
+   4. Phase 5: "ask my assistant", keyword search over tasks and saved messages first.
+   5. Phase 6, the PC-testable core: merging two phones' task lists, including both changing the same task offline.
+   Needs a phone, so not in this list: recordings and parser fixes, the accuracy check and prompt tuning, battery and `usage.ps1` numbers, HyperOS reliability, the on-phone tests, tags.
+7. After each step, update this document (§0 and the §7 tables), the assistant's notes (`docs/agent-memory`), and push `develop` and `main`.
 
 ### 0.4 How to resume in a new session
 
