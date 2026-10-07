@@ -1,8 +1,8 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phases 0–3 are coded. **Phase 4 (calendar) is coded**: part 1 (tasks to the calendar), part 2 (clash warnings) and part 3 (home-screen widget and Quick Settings tile). 947 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far; no phase has had its full phone check yet, and Phase 4 has not run on a phone.
-> **Last updated:** 2026-10-07, after building Phase 4 part 3.
-> **Next step:** the Phase 5 backup core (encrypted backup file, restore with merge), then search and the Phase 6 merge. The user installs 0.5.0, runs the phone checks (PHONE_CHECKLIST.md, sections 9 and 10), imports the Gemma 3 1B model if not done, and fixes follow → accuracy check on real labelled messages (eval/README.md) → tags.
+> **Status:** Phases 0–3 are coded. **Phase 4 (calendar) is coded** (tasks to the calendar, clash warnings, widget and tile), and **the core of Phase 5 (encrypted backup and restore with merge)** is coded. 1,081 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far; no phase has had its full phone check yet, and Phases 4 and 5 have not run on a phone.
+> **Last updated:** 2026-10-07, after building the Phase 5 backup core.
+> **Next step:** keyword search ("ask my assistant"), then the Phase 6 merge core. After that everything left needs a phone. The user installs 0.5.0, runs the phone checks (PHONE_CHECKLIST.md, sections 9 and 10), imports the Gemma 3 1B model if not done, and fixes follow → accuracy check on real labelled messages (eval/README.md) → tags.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
 
@@ -22,7 +22,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail / Keep notifications, rules about what to read, Inbox | 🧪 Code and tests done (464 PC tests in total). Not yet on a phone. WhatsApp's own account switcher is not told apart yet (§5.1). |
 | 3. AI suggestions | On-device AI turning messages into suggested tasks | 🧪 Code and tests done (704 PC tests in total). Not yet on a phone: the AI runtime has never run on a device, and the accuracy targets need the user's labelled messages. |
 | 4. Calendar + planning | Calendar sync, clashes, widget | 🧪 Parts 1 (tasks with a time → a calendar you choose), 2 (clash warnings) and 3 (home-screen widget, Quick Settings tile): code and tests done (947 PC tests in total), not yet on a phone. Auto-add with Undo waits for the Phase 3 accuracy numbers. |
-| 5. Backups + hardening | Encrypted Google Drive backups, reliability | ⬜ |
+| 5. Backups + hardening | Encrypted Google Drive backups, reliability | 🔨 Backup core 🧪 code and tests done (1,081 PC tests in total): encrypted backup file, restore with merge, Settings › Backup. Not yet on a phone. ⬜ Search, whether Drive accepts automatic weekly overwrites, battery and HyperOS hardening (need a phone). |
 | 6. Combined task list | One list across both phones | ⬜ |
 
 - **Git:** remote `https://github.com/MaahdiCodes/personal-ai-assistant` (private). `main` tracks `develop` (the user asked to merge before the phone checks): both hold Phases 0–2. New work goes on **`develop`**, then is merged into `main` and pushed; a tag `phase-N` marks each phase that passes its phone check.
@@ -61,6 +61,13 @@ This document is the single source of truth for the project. **§0 is the hand-o
   - It is plain `RemoteViews` with fixed lines (no list service) and `updatePeriodMillis = 0`: it is redrawn **only** when a task changes, when the titles switch changes, and on the existing wake-ups (app start, restart, time or time-zone change, the daily alarm). Between midnight and the next of those it can show yesterday: its date line makes that visible. With no widget on the home screen nothing is read and no database is opened. If the tasks can't be read (the phone has not been unlocked since a restart), it says "Open Mavick to see your tasks".
   - **Quick Settings tile "New task"** (`NewTaskTileService`): Mavick's **second service**, allowed on purpose in `allowedServices` (protected by `BIND_QUICK_SETTINGS_TILE`). Android binds it only while the quick-settings panel shows. **You add it yourself:** pull down the quick settings, pencil/edit, drag "New task" in. Tapping opens a new task (on a locked phone Android asks to unlock first).
   - `TaskRepository` now takes a list of `TaskChangeListener`s (the calendar and the widget), told after each saved change, each guarded so one failing never stops another or undoes the change.
+- **Phase 5 backup core as built** (§5.7 A):
+  - **Settings › Backup › Back up now…**: you choose a password (at least 8 characters, typed twice), Mavick makes an encrypted file (`mavick-backup-<date>.mavickbackup`) and Android's *Save to…* screen lets you put it in Google Drive (or anywhere). Mavick never touches the network; Google only ever holds an encrypted file. **Restore from a backup…**: pick the file, type its password, and see **what a restore would do before anything changes** (new tasks, tasks replaced by their newer version, tasks you changed since that stay, reading rules to add), with a box to also restore settings.
+  - **Contents:** tasks (finished and **deleted ones too**, so a restore can't undo a deletion), the rules about what Mavick reads, and the settings that travel (briefing, app lock, work days, date order, per-app reading, retention, suggestions, clash warnings, widget titles). **Never messages**, suggestions, the AI model, or anything that belongs to one phone (the chosen calendar and calendars checked, the reading pause, permission prompts, the Autostart tick, when the last backup was made).
+  - **Encryption:** AES-256-GCM, key from the password by PBKDF2-HMAC-SHA256 with 600,000 rounds (stored in the file); salt and nonce random per backup; the whole header is authenticated. A wrong password and a damaged file look the same, by design. Mavick never keeps the password, and wipes the characters it was given after use.
+  - **Merge (`TaskMerge`):** by task ID, the version edited last wins; at the same moment a deletion beats an edit; then the content decides, so the answer is the same whichever phone is "local". A winning version is stored with its own edit time, so restoring twice changes nothing, and a reminder already in the past is not replayed. Rules are only ever added (by id, and not a rule that means the same). A default keyword you deleted stays deleted. This is the merge code Phase 6 will reuse.
+  - Alarms, the calendar and the widget follow through the same listeners as any task change. Restoring settings reschedules the daily alarm and redraws the widget.
+  - Not built (needs a phone): whether Drive accepts automatic weekly overwrites, so there is no automatic backup and no weekly reminder yet; "Last backup: N days ago" shows in Settings.
 - **Versions:** app `versionCode 5`, `versionName 0.5.0`; database version 5.
 - **First phone test (Pixel 7 Pro, 2026-10-06):** the Gemma 3 1B model copied with `push-model.ps1` (SHA-256 matched) and imported in Settings. Two test messages each made a suggestion. Found: a suggestion's title copied the message's wording and ran on ("…is mentioned"), and the time in the title didn't match the sent text, so check the due time on the card. Not yet diagnosed; the accuracy check (eval/README.md) is the place to measure it. Do not change the prompt until the user has checked the due times.
 
@@ -84,7 +91,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 **Work that needs no phone** (the user wants these finished before the phone checks, 2026-10-07), in this order:
    1. ✅ Phase 4 part 2: clashes (§5.9), done 2026-10-07.
    2. ✅ Phase 4 part 3 (done 2026-10-07): widget and Quick Settings tile (§5.9).
-   3. Phase 5, the PC-testable core: the encrypted backup file (AES-256-GCM, password-derived key) and restore with merge by task UUID, newest `updatedAt` wins (§5.7 A). This is also the Phase 6 merge code. Whether Drive accepts background overwrites needs a phone, so it stays out.
+   3. ✅ (done 2026-10-07) Phase 5, the PC-testable core: the encrypted backup file (AES-256-GCM, password-derived key) and restore with merge by task UUID, newest `updatedAt` wins (§5.7 A). This is also the Phase 6 merge code. Whether Drive accepts background overwrites needs a phone, so it stays out.
    4. Phase 5: "ask my assistant", keyword search over tasks and saved messages first.
    5. Phase 6, the PC-testable core: merging two phones' task lists, including both changing the same task offline.
    Needs a phone, so not in this list: recordings and parser fixes, the accuracy check and prompt tuning, battery and `usage.ps1` numbers, HyperOS reliability, the on-phone tests, tags.
@@ -95,7 +102,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 1. `git fetch`, `git switch develop`, `git pull`. The local folder `E:\Personal\personal-ai-assistant` is already on `develop`.
 2. Read §0, then the sections for the phase being worked on.
 3. Check that the baseline passes:
-   - **Windows:** `.\scripts\test.ps1` (947 tests, Lint, permission and read-only checks).
+   - **Windows:** `.\scripts\test.ps1` (1,081 tests, Lint, permission and read-only checks).
    - **Linux or macOS:** `./gradlew :app:testDebugUnitTest :app:lintDebug :app:checkDebugPermissions :app:checkReleasePermissions :app:checkReadOnlyNotifications`. This needs JDK 17+ and an Android SDK with platform 36 and build-tools 36.1. The PowerShell scripts are Windows-only.
 4. Ask the user for anything in §0.2 that is still missing before starting work that depends on it.
 
@@ -111,7 +118,9 @@ app/src/main/kotlin/dev/maahdi/mavick/
   MainActivity.kt                 The only activity: share and selected text, notification taps, app-lock prompt
   capture/                        Phase 2: listener, NotificationReader, MessageParser, Noise, ExclusionEngine,
                                   MessageCapture, CaptureStatus (counts and times), CaptureChores, ListenerRestart
-  calendar/                       Phase 4: CalendarEvent and its rules, CalendarGateway (ContentResolver), CalendarSync, TaskCalendar
+  calendar/                       Phase 4: CalendarEvent and its rules, CalendarGateway (ContentResolver), CalendarSync, clashes (ClashFinder, ClashService)
+  widget/                         Phase 4: the home-screen widget (plan, renderer, updater, receiver) and the Quick Settings tile
+  backup/                         Phase 5: BackupCrypto (the file's protection), BackupJson (its contents), BackupService
   data/MavickDatabase.kt          Room database (version 5), opened with SQLCipher
   data/Converters.kt              java.time and RepeatRule to and from stored text and numbers
   data/security/                  Database key: Keystore wrapping, raw-key passphrase
@@ -329,6 +338,8 @@ Tasks ◄── quick-add / share / Add to Mavick / Inbox "Add as task" ──�
 |---|---|
 | `calendar` | `CalendarEvent` and `CalendarEventPolicy` (which tasks, how they look: pure), `CalendarGateway` (the phone's calendar storage as Mavick needs it) with `ContentResolverCalendarGateway`, `CalendarSync` (keeps events in step with tasks) and `TaskCalendar` (what `TaskRepository` tells it) |
 | `data/calendar` | `CalendarLinkEntity` and `CalendarLinkDao`: the event written for each task, on this phone only |
+| `widget` | `WidgetPlanner`, `TasksWidgetRenderer`, `WidgetUpdater` (a `TaskChangeListener`), `TasksWidgetProvider`, `NewTaskTileService`, `WidgetIntents` |
+| `backup` | `BackupCrypto` (AES-GCM, PBKDF2), `BackupJson` and `BackupSettings` (what is in the file), `BackupService` (make, open, preview, restore). `data/task/TaskMerge` is the merge. |
 
 **Planned**
 
@@ -336,7 +347,7 @@ Tasks ◄── quick-add / share / Add to Mavick / Inbox "Add as task" ──�
 |---|---|---|
 | `ai` | `TaskExtractor` interface, `RuleExtractor`, `GemmaExtractor`, output validation, model import | 3 (✅ built) |
 | `importers` | Keep Takeout import (the share sheet already lives in `share`) | 3 (✅ built) |
-| `widget` | Home-screen widget (`AppWidgetProvider` with `RemoteViews`) and the Quick Settings tile | 4, part 3 |
+
 | `ui` additions | Suggestions screen | 3 |
 
 ---
@@ -558,11 +569,11 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 - [x] Real messages are never committed to git. Private eval data and raw recordings live in git-ignored folders (`/eval/private/`, `/recordings/`). Test fixtures use **fake messages sent between your two phones**.
 - [x] The notification recorder exists only in debug builds; the release APK contains none of its code (checked in the built APK, 2026-10-05).
 - [x] Release builds signed with your own key: the user created it with `new-signing-key.ps1` (2026-10-05). Its backup (the `.p12` file to Drive and a USB drive, the password elsewhere) is the user's to confirm (§0.2). Losing them means the app can't be updated without uninstalling it, which wipes its data.
-- [ ] Encrypted backups to Google Drive (§5.7, Phase 5).
+- [x] Encrypted backups (§5.7 A, Phase 5): AES-256-GCM with a password-derived key; the user saves the file to Google Drive through Android's Save screen, so Mavick never touches the network. Raw messages, suggestions and the AI model are never in a backup. The password is never kept. (Automatic weekly backups are not built.)
 
 ### 5.7 Backups (Google Drive)
 
-**A. App data (tasks, exclusion rules, settings)** — Phase 5
+**A. App data (tasks, exclusion rules, settings)** — Phase 5 (the file, restore and merge are built; automatic weekly backup is not, see below)
 - **Back up now** encrypts a backup file inside Mavick, then opens Android's standard *Save to…* screen. You pick **Google Drive**, and the Drive app uploads the file. Mavick never touches the network.
 - **Encryption:** AES-256-GCM with a key derived from a **backup password you choose** (PBKDF2-HMAC-SHA256, high iteration count). Google only ever sees an encrypted file. If you forget this password, the backup can't be opened, by design.
 - **Contents:** tasks, including soft-deleted ones (tombstones), exclusion rules and settings, in a versioned format (`formatVersion` field) so old backups still import after app updates. **Raw messages are not included**: they are short-lived (14 days) and the most sensitive data.
@@ -747,6 +758,20 @@ Times assume part-time work, with Claude writing most of the code.
 | Release APK | ✅ 25.6 MB (budget raised to 30 MB). Same 4 permissions, 1 service |
 | Targets: precision ≥ 85%, recall ≥ 70%, ≤ 10 s per message, battery, warmth | ⏳ On the phones |
 
+**Phase 5 progress (2026-10-07)**
+
+| Item | Status |
+|---|---|
+| Encrypted backup file (AES-256-GCM, PBKDF2 600,000 rounds, authenticated header) | ✅ Built. Any changed byte, any cut, the wrong password and bad rounds are refused (tested) |
+| Backup contents: tasks incl. deleted, rules, travelling settings; never messages | ✅ Built. Damaged items are left out and counted, not fatal |
+| Restore with merge by task ID, newest edit wins, same answer from either side; rules only added | ✅ Built and tested, including random pairs and two phones merging into each other |
+| Settings › Backup: password, save through Android, pick and open, preview before restoring, settings box, results | ✅ Built, with view-model and screen tests |
+| Backup made on one phone, restored on the other (checklist §11) | ⏳ |
+| Whether Drive accepts automatic weekly overwrites; weekly reminder | ⬜ Needs a phone |
+| "Ask my assistant" (keyword search), battery profiling, HyperOS reliability | ⬜ |
+| PC tests + Lint | ✅ 1,081 tests, Lint: no issues |
+| Release APK | ✅ 25.7 MB (budget 30 MB). No new permission or service |
+
 **Phase 4 progress (2026-10-07)**
 
 | Item | Status |
@@ -762,14 +787,14 @@ Times assume part-time work, with Claude writing most of the code.
 | Part 3: home-screen widget (titles shown, can be hidden) and Quick Settings tile | ✅ Built and tested on the PC (planner, the drawn views and their taps, updates with a fake widget host, no read without a widget, the manifest: not exported, no timer, tile protected, only two services) |
 | Part 3 on the phones (checklist §10) | ⏳ |
 | Auto-add with Undo | ⬜ Waits for the Phase 3 accuracy numbers |
-| PC tests + Lint | ✅ 947 tests, Lint: no issues |
+| PC tests + Lint | ✅ 947 tests (at the end of Phase 4), Lint: no issues |
 | Release APK | ✅ 25.7 MB (budget 30 MB). Permissions: the 4 earlier plus `READ_CALENDAR` and `WRITE_CALENDAR`. 2 services (the listener and the tile) |
 
 ---
 
 ## 8. Testing strategy
 
-**As built (Phases 0–4): 947 PC tests, and the on-phone test classes listed below.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler, notifier and daily chores (same file), and the `task()` fixture (`sharedTest`).
+**As built (Phases 0–5 backup core): 1,081 PC tests, and the on-phone test classes listed below.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler, notifier and daily chores (same file), and the `task()` fixture (`sharedTest`).
 
 | Test class | Runs on | Covers |
 |---|---|---|
@@ -796,6 +821,12 @@ Times assume part-time work, with Claude writing most of the code.
 | `ClashServiceTest` | PC (Robolectric) | One read for many tasks and its range, off or no permission reads nothing, past and far tasks skipped, own events, chosen calendars (a gone calendar forgotten), failures mean no clashes, the editor's single slot |
 | `TasksViewModelTest` | PC (Robolectric) | Clashes reach the list state, the list shows before the calendar answers, reading again on return and on a settings change (and not on others), a calendar problem leaves the list working |
 | `TaskEditorScreenTest`, more in `EditorViewModelTest`, `ReminderEngineTest`, `SystemNotifierTest`, `ScreensTest`, `SettingsScreenTest` | PC (Robolectric + Compose) | The warning under the time, checks on open and on changing the date or time (a slow older answer never wins), clash lines first in the briefing and nothing on the lock screen, the row's warning, the clash switch and the calendar picker |
+| `BackupCryptoTest` | PC (JVM) | Round trip (empty, 5 MB, any alphabet), wrong password, empty password, the file showing nothing of its text, two backups differing, the layout as a contract, **every single changed byte and every cut length refused**, a newer format, rounds out of range |
+| `BackupJsonTest` | PC (JVM) | Every task field and every kind of repeat, awkward text, deleted tasks, rules, settings that travel and those that never do, a damaged task or rule left out and counted, later-version fields ignored, not-a-backup and newer-format files |
+| `TaskMergeTest` | PC (JVM) | Which version wins (and at the same moment), the plan's counts, merging twice, **the same winner whichever side is local for 500 random pairs, and two phones merging into each other ending alike for 200 random lists** |
+| `TaskRepositoryMergeTest`, more in `ExclusionRepositoryTest` | PC (Robolectric) | Stored as they were with their own edit times, alarms only for reminders still ahead, deletions, who is told, preview changing nothing; rules added by id or meaning, once, never removed |
+| `BackupServiceTest` | PC (Robolectric) | Back up on one phone and restore on another, including deleted tasks, reminders, default keywords not doubled or revived, settings kept per phone, **messages never in the file**, restoring twice, newer edits kept on either side, the preview, wrong password, passwords wiped, nothing touched by making a backup |
+| `BackupViewModelTest` and the backup tests in `SettingsScreenTest` | PC (Robolectric + Compose) | The whole dialog flow: password rules, the save screen, a refused place, a picked file (too big, unreadable, not a backup, wrong password then right), the preview, the settings box, cancelling forgetting the file, results; typed passwords hidden |
 | `WidgetPlannerTest` | PC (JVM) | Overdue first, five lines, the rest counted, titles hidden leaves only counts, empty day |
 | `TasksWidgetRendererTest` | PC (Robolectric) | The drawn views: date, summary, lines and their colours, "+N more", hidden titles appearing nowhere, empty and unreadable states, redrawing over an old draw, and what each tap opens |
 | `WidgetUpdaterTest` | PC (Robolectric, fake widget host) | Nothing read without a widget, every widget updated, following each kind of task change, titles hidden at once, a new day, an unreadable database and recovery, a failure never failing a task change |
@@ -928,6 +959,21 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | The widget is plain `RemoteViews` with five fixed lines and no timer; the tile is the second service (as decided on 2026-10-07) | A list widget needs another service; a timer wakes the phone. The date line shows staleness |
 | The calendar and the widget both follow tasks through one `TaskChangeListener` list in `TaskRepository` (replacing the calendar-only hook) | One mechanism, not two near copies; each listener guarded so none can break a change or another listener |
 | Warnings read the calendar when asked and keep nothing | No stale or stored calendar content; one read per request is cheap (60-day window) |
+
+**Decided during Phase 5 (2026-10-07)**
+
+| Decision | Why |
+|---|---|
+| The backup is a password-encrypted file the user saves through Android's Save screen (Drive included) | As planned (§5.7 A): Mavick still needs no internet permission, and Google only holds an encrypted file |
+| JSON built by hand over the JSON tree, not generated serializers | A damaged task or rule is left out and counted instead of making the whole backup unreadable; no compiler plugin; the field names are a contract |
+| 600,000 PBKDF2 rounds, stored in the file; refused outside 1,000–5,000,000 | Slows guessing; a crafted file can't hang the phone |
+| Tasks are backed up **with deleted ones** | Otherwise a restore would bring back what you deleted |
+| Merge: newest `updatedAt` wins; a deletion wins a tie; then content decides | The same answer from either side, which Phase 6 needs; tested on random pairs |
+| A winning version keeps its own edit time; past reminders are not replayed | Restoring twice changes nothing; no burst of old reminders |
+| Rules are only added (by id, or by meaning), never removed; a deleted default keyword stays deleted | A restore can't weaken what Mavick is told not to read; the user's deletion of a default is remembered |
+| Travelling settings only; the calendar choice, the reading pause, permissions, Autostart and the last-backup time stay with the phone | Their values mean nothing on another phone, or must never change by surprise (a pause) |
+| The restore shows a preview and has a "restore settings" box, ticked | Nothing changes until the user has seen what will |
+| No automatic weekly backup yet | Needs a phone to learn whether Drive accepts background overwrites (§5.7 A) |
 
 **Still open**
 

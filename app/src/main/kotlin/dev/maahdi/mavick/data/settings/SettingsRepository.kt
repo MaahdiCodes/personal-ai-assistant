@@ -47,6 +47,8 @@ data class AppSettings(
     val clashCalendarIds: Set<Long> = emptySet(),
     /** Show task titles on the home-screen widget (Phase 4, part 3). Off shows only counts. */
     val widgetShowTitles: Boolean = true,
+    /** When a backup file was last saved from this phone (Phase 5); never part of a backup. */
+    val lastBackupAt: Instant? = null,
 ) {
     fun captureFor(app: SourceApp): AppCapture = appCapture[app] ?: AppCapture()
 
@@ -120,6 +122,7 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             clashCheckEnabled = preferences.getBoolean(KEY_CLASH_ENABLED, defaults.clashCheckEnabled),
             clashCalendarIds = parseIds(preferences.getString(KEY_CLASH_CALENDARS, null)),
             widgetShowTitles = preferences.getBoolean(KEY_WIDGET_TITLES, defaults.widgetShowTitles),
+            lastBackupAt = preferences.getString(KEY_LAST_BACKUP, null)?.toLongOrNull()?.let(Instant::ofEpochMilli),
         )
     }
 
@@ -151,6 +154,7 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             if (settings.calendarName == null) remove(KEY_CALENDAR_NAME) else putString(KEY_CALENDAR_NAME, settings.calendarName)
             putBoolean(KEY_CLASH_ENABLED, settings.clashCheckEnabled)
             putBoolean(KEY_WIDGET_TITLES, settings.widgetShowTitles)
+            if (settings.lastBackupAt == null) remove(KEY_LAST_BACKUP) else putString(KEY_LAST_BACKUP, settings.lastBackupAt.toEpochMilli().toString())
             if (settings.clashCalendarIds.isEmpty()) remove(KEY_CLASH_CALENDARS) else putString(KEY_CLASH_CALENDARS, settings.clashCalendarIds.sorted().joinToString(","))
         }
     }
@@ -206,5 +210,6 @@ class SettingsRepository(private val preferences: SharedPreferences) {
         private const val KEY_CLASH_ENABLED = "clash_check_enabled"
         private const val KEY_CLASH_CALENDARS = "clash_calendar_ids"
         private const val KEY_WIDGET_TITLES = "widget_show_titles"
+        private const val KEY_LAST_BACKUP = "last_backup_at"
     }
 }

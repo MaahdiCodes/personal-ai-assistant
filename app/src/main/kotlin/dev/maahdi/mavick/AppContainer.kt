@@ -3,6 +3,7 @@ package dev.maahdi.mavick
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.os.storage.StorageManager
 import dev.maahdi.mavick.ai.AiStatusStore
@@ -16,6 +17,7 @@ import dev.maahdi.mavick.ai.SuggestionQueue
 import dev.maahdi.mavick.ai.SuggestionWorker
 import dev.maahdi.mavick.ai.eval.EvalExport
 import dev.maahdi.mavick.ai.eval.EvalExportFile
+import dev.maahdi.mavick.backup.BackupService
 import dev.maahdi.mavick.calendar.CalendarGateway
 import dev.maahdi.mavick.calendar.CalendarSync
 import dev.maahdi.mavick.calendar.ClashService
@@ -125,6 +127,20 @@ class AppContainer(context: Context) {
 
     /** The calendar sync for screens, opened off the main thread (it needs the database). */
     suspend fun openCalendarSync(): CalendarSync = offMain { calendarSync }
+
+    /** Encrypted backups and restores (Phase 5). */
+    val backups: BackupService by lazy {
+        val versionName = appContext.packageManager.getPackageInfo(appContext.packageName, PackageManager.PackageInfoFlags.of(0)).versionName
+        BackupService(tasks, exclusions, settings, clock, versionName.orEmpty())
+    }
+
+    suspend fun openBackups(): BackupService = offMain { backups }
+
+    /** After a restore: the settings (the briefing time, the widget's titles) may have changed. */
+    suspend fun afterRestore() {
+        reminderEngine.scheduleDailyAlarm()
+        widgets.update()
+    }
 
     /** The clash check for screens, opened off the main thread (it needs the database). */
     suspend fun openClashes(): ClashService = offMain { clashes }

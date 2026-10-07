@@ -49,6 +49,65 @@ class ExclusionRepositoryTest {
         assertThat(settings.current.defaultRulesAdded).isTrue()
     }
 
+    private fun incoming(id: String, value: String, type: RuleType = RuleType.KEYWORD, app: SourceApp? = null, account: String? = null) =
+        ExclusionRuleEntity(id, type, RuleEffect.EXCLUDE, value, app, account, value, clock.instant())
+
+    @Test
+    fun `a snapshot reads the rules without adding the defaults`() = runTest {
+        assertThat(repository.snapshot()).isEmpty()
+        assertThat(settings.current.defaultRulesAdded).isFalse()
+    }
+
+    @Test
+    fun `rules from a backup are added when this phone doesn't have them`() = runTest {
+        val added = repository.importMissing(listOf(incoming("r1", "salary"), incoming("r2", "Sam", RuleType.SENDER, SourceApp.WHATSAPP)))
+
+        assertThat(added).isEqualTo(2)
+        assertThat(repository.snapshot().map { it.id }).containsExactly("r1", "r2")
+    }
+
+    @Test
+    fun `a rule this phone has, by id or by meaning, is not added again`() = runTest {
+        repository.importMissing(listOf(incoming("r1", "salary")))
+
+        val added = repository.importMissing(
+            listOf(incoming("r1", "something else"), incoming("other-id", "SALARY"), incoming("r3", "salary", app = SourceApp.GMAIL)),
+        )
+
+        // The same id is the same rule; the same words (any case) in the same place mean the same rule;
+        // the same words for another app are a different rule.
+        assertThat(added).isEqualTo(1)
+        assertThat(repository.snapshot().map { it.id }).containsExactly("r1", "r3")
+    }
+
+    @Test
+    fun `the same rule twice in one backup is added once`() = runTest {
+        assertThat(repository.importMissing(listOf(incoming("r1", "salary"), incoming("r2", "Salary")))).isEqualTo(1)
+    }
+
+    @Test
+    fun `counting what would be added changes nothing and agrees with adding`() = runTest {
+        val rules = listOf(incoming("r1", "salary"), incoming("r2", "bonus"))
+
+        val counted = repository.countMissing(rules)
+
+        assertThat(repository.snapshot()).isEmpty()
+        assertThat(repository.importMissing(rules)).isEqualTo(counted)
+    }
+
+    @Test
+    fun `importing never removes or changes a rule`() = runTest {
+        val mine = repository.add(RuleType.KEYWORD, RuleEffect.EXCLUDE, "mine", "mine")!!
+
+        repository.importMissing(listOf(incoming("r1", "salary")))
+
+        val after = repository.snapshot()
+        // (Adding a first rule also brought the four default keywords.)
+        assertThat(after.map { it.id }).containsAtLeast(mine.id, "r1")
+        assertThat(after).hasSize(6)
+        assertThat(after.first { it.id == mine.id }).isEqualTo(mine)
+    }
+
     @Test
     fun `a deleted default stays deleted`() = runTest {
         val pin = repository.all().single { it.value == "PIN" }

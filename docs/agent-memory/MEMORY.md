@@ -1,4 +1,4 @@
-- [Mavick phase status](project_mavick_phase_status.md) — Phases 0-3 coded; Phase 4 (calendar, clashes, widget, tile) fully coded 2026-10-07; Phase 5 backup core next; no phone check passed yet
+- [Mavick phase status](project_mavick_phase_status.md) — Phases 0-3, Phase 4 and the Phase 5 backup core coded 2026-10-07; search and Phase 6 merge core next; no phone check passed yet
 - [Update memory every phase](feedback_mavick_update_memory_every_phase.md) — keep memory current at each phase end, not only the plan
 - [Explain the phase first](feedback_mavick_explain_phase_first.md) — when starting a phase, say what it builds, then ask only the user's decisions
 - [Work on another PC](project_mavick_other_pc.md) — pull, run scripts/sync-memory.ps1, follow docs/SETUP_NEW_PC.md

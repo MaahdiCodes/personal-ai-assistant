@@ -44,6 +44,39 @@ class ExclusionRepository(
         insertUnlessPresent(type, effect, value, displayName, app, accountKey)
     }
 
+    /** Every rule as it is, without adding the default ones: for a backup. */
+    suspend fun snapshot(): List<ExclusionRuleEntity> = dao.getAll()
+
+    /**
+     * Adds the rules of a backup that this phone doesn't have: by ID, and not a rule that already means
+     * the same (the default keywords, on a phone that has added them). Rules are only ever added here,
+     * never removed or changed. Returns how many were added.
+     */
+    suspend fun importMissing(incoming: Collection<ExclusionRuleEntity>): Int = lock.withLock {
+        val missing = missingFrom(incoming)
+        missing.forEach { dao.insert(it) }
+        missing.size
+    }
+
+    /** How many rules [importMissing] would add. */
+    suspend fun countMissing(incoming: Collection<ExclusionRuleEntity>): Int = lock.withLock { missingFrom(incoming).size }
+
+    private suspend fun missingFrom(incoming: Collection<ExclusionRuleEntity>): List<ExclusionRuleEntity> {
+        val have = dao.getAll().toMutableList()
+        val missing = mutableListOf<ExclusionRuleEntity>()
+        for (rule in incoming) {
+            val known = have.any { it.id == rule.id } || have.any { mine ->
+                mine.type == rule.type && mine.effect == rule.effect && mine.app == rule.app &&
+                    mine.accountKey == rule.accountKey && mine.value.equals(rule.value, ignoreCase = true)
+            }
+            if (!known) {
+                missing += rule
+                have += rule
+            }
+        }
+        return missing
+    }
+
     suspend fun remove(id: String) {
         dao.delete(id)
     }

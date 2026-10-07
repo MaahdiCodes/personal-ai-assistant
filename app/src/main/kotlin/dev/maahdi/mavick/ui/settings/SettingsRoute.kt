@@ -57,6 +57,8 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val aiViewModel: AiSettingsViewModel = viewModel(factory = AiSettingsViewModel.factory(container))
     val ai by aiViewModel.state.collectAsStateWithLifecycle()
+    val backupViewModel: BackupViewModel = viewModel(factory = BackupViewModel.factory(container))
+    val backup by backupViewModel.state.collectAsStateWithLifecycle()
     val calendarViewModel: CalendarSettingsViewModel = viewModel(factory = CalendarSettingsViewModel.factory(container))
     val calendar by calendarViewModel.state.collectAsStateWithLifecycle()
     var health by remember { mutableStateOf(readHealth(context, container)) }
@@ -90,6 +92,13 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
     val requestClashPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         calendarViewModel.onClashPermissionResult(results.isNotEmpty() && results.values.all { it })
     }
+    val saveBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri == null) backupViewModel.cancel() else backupViewModel.saveTo { bytes -> writeTo(context, uri, bytes) }
+    }
+    val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) backupViewModel.onFilePicked { readBackup(context, uri) }
+    }
+    LaunchedEffect(backupViewModel) { backupViewModel.askToSave.collect { name -> saveBackup.launch(name) } }
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val file = PickedFile.from(context.contentResolver, uri)
@@ -103,6 +112,17 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
         health = health.copy(storage = storage, disconnectsThisWeek = disconnects),
         ai = ai,
         calendar = calendar,
+        backup = backup,
+        backupActions = BackupActions(
+            onStartBackup = backupViewModel::startBackup,
+            onNewPassword = { password, confirm -> backupViewModel.submitNewPassword(password, confirm) },
+            // Any file: phones don't know a type for .mavickbackup. The restore checks the file itself.
+            onStartRestore = { pickBackup.launch(arrayOf("*/*")) },
+            onRestorePassword = { backupViewModel.submitRestorePassword(it) },
+            onRestoreSettings = backupViewModel::setRestoreSettings,
+            onConfirmRestore = { backupViewModel.confirmRestore() },
+            onCancel = backupViewModel::cancel,
+        ),
         exportOutcome = exportOutcome,
         now = Instant.now(container.clock()),
         zone = container.clock().zone,
@@ -177,6 +197,21 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
             onDelete = { PickedFile.delete(context.contentResolver, source).also { deleted -> if (deleted) pickedModel = null } },
             onKeep = { pickedModel = null },
         )
+    }
+}
+
+/** Puts [bytes] in the file chosen in Android's "Save to" screen. Throws if the phone refuses. */
+private fun writeTo(context: Context, uri: Uri, bytes: ByteArray) {
+    val output = context.contentResolver.openOutputStream(uri) ?: throw IOException("No access to the chosen file")
+    output.use { it.write(bytes) }
+}
+
+/** The bytes of the picked backup, or null when it is bigger than any backup can be. */
+private fun readBackup(context: Context, uri: Uri): ByteArray? {
+    val input = context.contentResolver.openInputStream(uri) ?: throw IOException("No access to the chosen file")
+    input.use {
+        val bytes = it.readNBytes(BackupViewModel.MAX_FILE_BYTES + 1)
+        return bytes.takeIf { read -> read.size <= BackupViewModel.MAX_FILE_BYTES }
     }
 }
 

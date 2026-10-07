@@ -117,6 +117,8 @@ fun SettingsScreen(
     onChooseCheckedCalendars: () -> Unit,
     onCheckedCalendars: (Set<Long>) -> Unit,
     onCloseCheckedPicker: () -> Unit,
+    backup: BackupUiState,
+    backupActions: BackupActions,
     onFixNotifications: () -> Unit,
     onFixBattery: () -> Unit,
     onFixNotificationAccess: () -> Unit,
@@ -252,6 +254,16 @@ fun SettingsScreen(
                 summary = stringResource(R.string.settings_widget_titles_summary),
                 checked = settings.widgetShowTitles,
                 onCheckedChange = { shown -> onChange { it.copy(widgetShowTitles = shown) } },
+            )
+            HorizontalDivider()
+
+            BackupSection(
+                lastBackupAt = settings.lastBackupAt,
+                state = backup,
+                now = now,
+                zone = zone,
+                use24Hour = use24Hour,
+                actions = backupActions,
             )
             HorizontalDivider()
 

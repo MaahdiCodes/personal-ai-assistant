@@ -378,6 +378,74 @@
     <string name="calendar_missing">The calendar you chose is not on this phone any more. Choose another.</string>
     <string name="calendar_pick_title">Choose a calendar</string>
     <string name="calendar_pick_loading">Looking for calendars…</string>
+    <!-- Settings: backup (Phase 5) -->
+    <string name="settings_backup">Backup</string>
+    <string name="backup_never">No backup made yet.</string>
+    <string name="backup_last">Last backup: %1$s</string>
+    <string name="backup_summary">A backup holds your tasks (finished and deleted ones too), the rules about what Mavick reads, and your settings. Never your messages. It is encrypted with a password you choose, which Mavick does not keep: without it the file can\'t be opened. Save it to Google Drive from Android\'s Save screen: Google then only ever holds an encrypted file.</string>
+    <string name="backup_now">Back up now…</string>
+    <string name="backup_restore">Restore from a backup…</string>
+    <string name="backup_password_title">Choose a password</string>
+    <string name="backup_password_hint">Write it down somewhere safe, such as a password manager. If you forget it, this backup can\'t be opened, by design.</string>
+    <string name="backup_password_label">Password</string>
+    <string name="backup_password_confirm">Password again</string>
+    <string name="backup_password_short">Use at least 8 characters.</string>
+    <string name="backup_password_mismatch">The two passwords differ.</string>
+    <string name="backup_password_wrong">That password doesn\'t open this backup, or the file is damaged.</string>
+    <string name="backup_make">Make backup</string>
+    <string name="backup_open_title">Password of this backup</string>
+    <string name="backup_open_hint">The password you chose when you made it.</string>
+    <string name="backup_open">Open</string>
+    <string name="backup_working">One moment…</string>
+    <string name="backup_preview_title">Restore this backup?</string>
+    <string name="backup_preview_made">Made %1$s.</string>
+    <plurals name="backup_preview_tasks">
+        <item quantity="one">It holds %d task.</item>
+        <item quantity="other">It holds %d tasks.</item>
+    </plurals>
+    <string name="backup_preview_nothing">This phone already has everything in it.</string>
+    <plurals name="backup_preview_added">
+        <item quantity="one">%d new task will be added.</item>
+        <item quantity="other">%d new tasks will be added.</item>
+    </plurals>
+    <plurals name="backup_preview_updated">
+        <item quantity="one">%d task will be replaced by its newer version.</item>
+        <item quantity="other">%d tasks will be replaced by their newer versions.</item>
+    </plurals>
+    <plurals name="backup_preview_kept">
+        <item quantity="one">%d task you changed since stays as it is.</item>
+        <item quantity="other">%d tasks you changed since stay as they are.</item>
+    </plurals>
+    <plurals name="backup_preview_rules">
+        <item quantity="one">%d reading rule will be added.</item>
+        <item quantity="other">%d reading rules will be added.</item>
+    </plurals>
+    <plurals name="backup_preview_skipped">
+        <item quantity="one">%d item in the file couldn\'t be read and is left out.</item>
+        <item quantity="other">%d items in the file couldn\'t be read and are left out.</item>
+    </plurals>
+    <string name="backup_preview_settings">Also restore my settings</string>
+    <string name="backup_restore_confirm">Restore</string>
+    <plurals name="backup_saved">
+        <item quantity="one">Backup saved: %d task.</item>
+        <item quantity="other">Backup saved: %d tasks.</item>
+    </plurals>
+    <string name="backup_save_failed">The backup couldn\'t be saved. Nothing was changed. Try another place.</string>
+    <string name="backup_not_a_backup">That isn\'t a Mavick backup.</string>
+    <string name="backup_newer">This backup was made by a newer Mavick. Update Mavick, then try again.</string>
+    <string name="backup_read_failed">That file couldn\'t be read. Nothing was changed.</string>
+    <string name="backup_too_big">That file is too big to be a Mavick backup.</string>
+    <string name="backup_restored_nothing">Done. This phone already had everything.</string>
+    <plurals name="backup_restored_tasks">
+        <item quantity="one">Restored: %d task added or updated.</item>
+        <item quantity="other">Restored: %d tasks added or updated.</item>
+    </plurals>
+    <plurals name="backup_restored_rules">
+        <item quantity="one">%d reading rule added.</item>
+        <item quantity="other">%d reading rules added.</item>
+    </plurals>
+    <string name="backup_restored_settings">Settings restored.</string>
+
     <!-- Home-screen widget and Quick Settings tile (Phase 4, part 3) -->
     <string name="widget_label">Mavick: today</string>
     <string name="widget_description">Today\'s and overdue tasks, and a button for a new task</string>

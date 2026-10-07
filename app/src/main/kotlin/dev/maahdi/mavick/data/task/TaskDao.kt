@@ -62,6 +62,10 @@ interface TaskDao {
     @Query("SELECT * FROM task WHERE status = 'OPEN' AND deletedAt IS NULL AND dueDate IS NOT NULL AND dueTime IS NOT NULL")
     suspend fun getOpenTimed(): List<TaskEntity>
 
+    /** Every task, including deleted ones (they are kept as proof of the deletion): for backups and merging. */
+    @Query("SELECT * FROM task")
+    suspend fun getAll(): List<TaskEntity>
+
     @Query("SELECT COUNT(*) FROM task WHERE deletedAt IS NULL")
     suspend fun countActive(): Int
 

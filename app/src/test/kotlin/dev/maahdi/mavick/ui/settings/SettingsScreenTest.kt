@@ -9,9 +9,13 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.maahdi.mavick.ai.AiPause
+import dev.maahdi.mavick.backup.BackupProblem
+import dev.maahdi.mavick.backup.RestorePreview
+import dev.maahdi.mavick.backup.RestoreReport
 import dev.maahdi.mavick.ai.AiStatus
 import dev.maahdi.mavick.ai.ImportProblem
 import dev.maahdi.mavick.ai.ModelCheck
@@ -43,6 +47,7 @@ class SettingsScreenTest {
         ai: AiSettingsState = AiSettingsState(),
         exportOutcome: ExportOutcome? = null,
         calendar: CalendarSettingsState = CalendarSettingsState(permissionGranted = true, loaded = true),
+        backup: BackupUiState = BackupUiState(),
     ) {
         compose.setContent {
             SettingsScreen(
@@ -50,6 +55,16 @@ class SettingsScreenTest {
                 health = health,
                 ai = ai,
                 calendar = calendar,
+                backup = backup,
+                backupActions = BackupActions(
+                    onStartBackup = { calls += "backup start" },
+                    onNewPassword = { password, confirm -> calls += "backup password $password/$confirm" },
+                    onStartRestore = { calls += "restore start" },
+                    onRestorePassword = { password -> calls += "restore password $password" },
+                    onRestoreSettings = { on -> calls += "restore settings $on" },
+                    onConfirmRestore = { calls += "restore confirm" },
+                    onCancel = { calls += "backup cancel" },
+                ),
                 exportOutcome = exportOutcome,
                 now = now,
                 zone = TEST_ZONE,
@@ -450,6 +465,199 @@ class SettingsScreenTest {
         compose.onNodeWithText("Updating the calendar…").performScrollTo().assertExists()
         compose.onNodeWithText("4 tasks are in the calendar").assertDoesNotExist()
     }
+
+    // --- Backup ---
+
+    private fun typeInto(field: Int, text: String) {
+        compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[field].performTextInput(text)
+    }
+
+    private val preview = RestorePreview(
+        createdAt = now.minus(Duration.ofDays(2)),
+        tasksInBackup = 12,
+        tasksAdded = 3,
+        tasksUpdated = 2,
+        tasksKeptNewer = 1,
+        rulesAdded = 4,
+        skipped = 0,
+    )
+
+    @Test
+    fun `with no backup made the section says so and offers both buttons`() {
+        show(working)
+
+        compose.onNodeWithText("No backup made yet.").performScrollTo().assertExists()
+        compose.onNodeWithText("Never your messages.", substring = true).assertExists()
+        compose.onNodeWithText("Back up now…").performScrollTo().performClick()
+        compose.onNodeWithText("Restore from a backup…").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("backup start", "restore start").inOrder()
+    }
+
+    @Test
+    fun `the section says when the last backup was made`() {
+        settings = settings.copy(lastBackupAt = now.minus(Duration.ofHours(5)))
+        show(working)
+
+        compose.onNodeWithText("Last backup: 5 h ago").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `the buttons wait while a backup or restore is under way`() {
+        show(working, backup = BackupUiState(BackupStep.Working))
+
+        compose.onNodeWithText("Back up now…").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Restore from a backup…").assertIsNotEnabled()
+        compose.onNodeWithText("One moment…").assertExists()
+    }
+
+    @Test
+    fun `a new password is asked twice and passed on as typed`() {
+        show(working, backup = BackupUiState(BackupStep.NewPassword))
+
+        compose.onNodeWithText("Choose a password").assertExists()
+        compose.onNodeWithText("Write it down somewhere safe", substring = true).assertExists()
+        typeInto(0, "correct horse")
+        typeInto(1, "correct horse")
+        compose.onNodeWithText("Make backup").performClick()
+
+        assertThat(calls).containsExactly("backup password correct horse/correct horse")
+    }
+
+    @Test
+    fun `the password's mistakes are said under the fields`() {
+        show(working, backup = BackupUiState(BackupStep.NewPassword, PasswordProblem.TOO_SHORT))
+        compose.onNodeWithText("Use at least 8 characters.").assertExists()
+    }
+
+    @Test
+    fun `two passwords that differ are said`() {
+        show(working, backup = BackupUiState(BackupStep.NewPassword, PasswordProblem.MISMATCH))
+        compose.onNodeWithText("The two passwords differ.").assertExists()
+    }
+
+    @Test
+    fun `typed passwords are hidden`() {
+        show(working, backup = BackupUiState(BackupStep.NewPassword))
+
+        typeInto(0, "secret-word")
+
+        // What is shown is dots; the typed text itself is not displayed.
+        val shown = compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[0]
+            .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+        assertThat(shown).isNotEmpty()
+        assertThat(shown).doesNotContain("secret")
+    }
+
+    @Test
+    fun `cancelling the password closes the dialog without making anything`() {
+        show(working, backup = BackupUiState(BackupStep.NewPassword))
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        assertThat(calls).containsExactly("backup cancel")
+    }
+
+    @Test
+    fun `the password of a backup being opened is asked once, and a wrong one is said`() {
+        show(working, backup = BackupUiState(BackupStep.RestorePassword, PasswordProblem.WRONG))
+
+        compose.onNodeWithText("Password of this backup").assertExists()
+        compose.onNodeWithText("That password doesn't open this backup, or the file is damaged.").assertExists()
+        typeInto(0, "my password")
+        compose.onNodeWithText("Open").performClick()
+
+        assertThat(calls).containsExactly("restore password my password")
+    }
+
+    @Test
+    fun `the preview says what a restore would do, before anything changes`() {
+        show(working, backup = BackupUiState(BackupStep.Previewing(preview)))
+
+        compose.onNodeWithText("Restore this backup?").assertExists()
+        compose.onNodeWithText("It holds 12 tasks.").assertExists()
+        compose.onNodeWithText("3 new tasks will be added.", substring = true).assertExists()
+        compose.onNodeWithText("2 tasks will be replaced by their newer versions.", substring = true).assertExists()
+        compose.onNodeWithText("1 task you changed since stays as it is.", substring = true).assertExists()
+        compose.onNodeWithText("4 reading rules will be added.", substring = true).assertExists()
+        assertThat(calls).isEmpty()
+    }
+
+    @Test
+    fun `a backup that adds nothing says so`() {
+        val nothing = preview.copy(tasksAdded = 0, tasksUpdated = 0, tasksKeptNewer = 0, rulesAdded = 0)
+        show(working, backup = BackupUiState(BackupStep.Previewing(nothing)))
+
+        compose.onNodeWithText("This phone already has everything in it.").assertExists()
+    }
+
+    @Test
+    fun `items that could not be read are counted in the preview`() {
+        show(working, backup = BackupUiState(BackupStep.Previewing(preview.copy(skipped = 2))))
+
+        compose.onNodeWithText("2 items in the file couldn't be read and are left out.").assertExists()
+    }
+
+    @Test
+    fun `restoring the settings is a box, ticked at first`() {
+        show(working, backup = BackupUiState(BackupStep.Previewing(preview, restoreSettings = true)))
+
+        compose.onNodeWithText("Also restore my settings").performClick()
+        compose.onNodeWithText("Restore").performClick()
+
+        assertThat(calls).containsExactly("restore settings false", "restore confirm").inOrder()
+    }
+
+    @Test
+    fun `cancelling the preview restores nothing`() {
+        show(working, backup = BackupUiState(BackupStep.Previewing(preview)))
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        assertThat(calls).containsExactly("backup cancel")
+    }
+
+    private fun finished(result: BackupResult) = BackupUiState(BackupStep.Finished(result))
+
+    @Test
+    fun `a saved backup says how many tasks it holds`() {
+        show(working, backup = finished(BackupResult.Saved(3)))
+        compose.onNodeWithText("Backup saved: 3 tasks.").assertExists()
+        compose.onNodeWithText("OK").performClick()
+        assertThat(calls).containsExactly("backup cancel")
+    }
+
+    private fun endsWith(result: BackupResult, text: String) {
+        show(working, backup = finished(result))
+        compose.onNodeWithText(text).assertExists()
+    }
+
+    @Test
+    fun `a save that failed is said plainly`() =
+        endsWith(BackupResult.SaveFailed, "The backup couldn't be saved. Nothing was changed. Try another place.")
+
+    @Test
+    fun `a file that is not a backup is said`() = endsWith(BackupResult.Problem(BackupProblem.NOT_A_BACKUP), "That isn't a Mavick backup.")
+
+    @Test
+    fun `a backup from a newer Mavick says to update`() =
+        endsWith(BackupResult.Problem(BackupProblem.NEWER_FORMAT), "This backup was made by a newer Mavick. Update Mavick, then try again.")
+
+    @Test
+    fun `a file that could not be read is said`() = endsWith(BackupResult.ReadFailed, "That file couldn't be read. Nothing was changed.")
+
+    @Test
+    fun `a file that is far too big is said`() = endsWith(BackupResult.TooBig, "That file is too big to be a Mavick backup.")
+
+    @Test
+    fun `a restore that changed nothing says the phone had everything`() =
+        endsWith(BackupResult.Restored(RestoreReport(0, 0, 0, 0, settingsRestored = false, skipped = 0)), "Done. This phone already had everything.")
+
+    @Test
+    fun `a restore says what it did`() = endsWith(
+        BackupResult.Restored(RestoreReport(3, 1, 0, 2, settingsRestored = true, skipped = 0)),
+        "Restored: 4 tasks added or updated.\n2 reading rules added.\nSettings restored.",
+    )
 
     // --- The widget ---
 

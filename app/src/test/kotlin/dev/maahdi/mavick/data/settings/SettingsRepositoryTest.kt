@@ -152,6 +152,22 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `no backup has been made at first, and the time of the last one survives a restart`() {
+        assertThat(SettingsRepository(preferences).current.lastBackupAt).isNull()
+
+        SettingsRepository(preferences).update { it.copy(lastBackupAt = Instant.parse("2026-10-07T06:30:00Z")) }
+
+        assertThat(SettingsRepository(preferences).current.lastBackupAt).isEqualTo(Instant.parse("2026-10-07T06:30:00Z"))
+    }
+
+    @Test
+    fun `a damaged time of the last backup reads as no backup`() {
+        preferences.edit().putString("last_backup_at", "yesterday").commit()
+
+        assertThat(SettingsRepository(preferences).current.lastBackupAt).isNull()
+    }
+
+    @Test
     fun `the widget shows titles at first, and hiding them survives a restart`() {
         assertThat(SettingsRepository(preferences).current.widgetShowTitles).isTrue()
 

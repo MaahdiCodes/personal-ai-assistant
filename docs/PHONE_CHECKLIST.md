@@ -1,9 +1,9 @@
-# Phone check: Phases 0 to 4
+# Phone check: Phases 0 to 5
 
 Do this on **each phone**. Sections 1–7 check Phases 0 + 1 (tasks and reminders): about 20
 minutes of hands-on time, plus some waiting for the long reminder tests (you can use the phone
 normally while you wait). Section 8 checks Phase 2 (reading messages), section 9 Phase 3
-(suggested tasks and the AI model), section 10 Phase 4 (your calendar).
+(suggested tasks and the AI model), section 10 Phase 4 (your calendar), section 11 Phase 5 (backup).
 
 Run the scripts from the project folder in PowerShell. Add `-Phone pixel` or `-Phone poco` when
 both phones are connected.
@@ -391,4 +391,46 @@ in a calendar that shows on the phone.
 | Quick Settings tile: add it, tap it, locked phone | | |
 | usage.ps1: services (expect 2), alarms, jobs | | |
 | On-phone calendar tests pass (`test.ps1 -OnPhone`) | | |
+| Problems seen | | |
+
+## 11. Phase 5: backup and restore
+
+A backup is a file protected by a password you choose. It holds your tasks (also finished and
+deleted ones), the rules about what Mavick reads and your settings. **Never your messages.** You
+save it through Android's *Save to…* screen, for example into Google Drive.
+
+- [ ] Settings › Backup › **Back up now…**. A password shorter than 8 characters, or two passwords that
+      differ, are refused with a message. Choose a password you will remember, e.g. `test-backup-1`.
+- [ ] Android's *Save to…* screen opens with the name `mavick-backup-<date>.mavickbackup`. Choose **Google
+      Drive**. It says "Backup saved: N tasks." and Settings shows **Last backup: just now**.
+- [ ] Open the file in Drive: it is unreadable (it is encrypted). Drive's preview shows nothing useful.
+- [ ] **Restore from a backup…** on the **same** phone, pick that file. A wrong password says so and lets
+      you try again. The right one shows **"This phone already has everything in it."** (nothing changes).
+- [ ] Change a task here (rename it), then restore the same file: the preview says **"1 task you changed
+      since stays as it is."** Restore: your edit is **kept**.
+- [ ] Delete a task here, then restore the older file: the task **stays deleted**.
+- [ ] **On the other phone** (install the same version): Settings › Backup › Restore from a backup…, pick
+      the file from Drive (it may need a moment to download), type the password. The preview lists the new
+      tasks and reading rules. Restore with **Also restore my settings** ticked: the tasks appear, the
+      briefing time and other settings match the first phone. **Its calendar choice and reading pause are
+      its own and are not changed.**
+- [ ] A reminder in the restored tasks that is still ahead rings on the other phone; one already past does not.
+- [ ] Restore the same file again: "This phone already has everything in it."
+- [ ] Pick a file that is not a backup (a photo): "That isn't a Mavick backup." and nothing changes.
+- [ ] Messages: after restoring on the other phone, its Inbox does **not** contain the first phone's messages.
+- [ ] Time it: how long did *Make backup* and *Open* take (the password is stretched on purpose)? Note it.
+- [ ] Whether Drive lets you **overwrite** the same file from the Save screen next week (this decides
+      whether a weekly automatic backup is possible): note what happened.
+
+### Results (Phase 5)
+
+| Item | Pixel 7 Pro | Poco X7 Pro |
+|---|---|---|
+| Backup saved to Drive, "Last backup" shown | | |
+| Wrong password refused, right one opens | | |
+| Restore on the same phone: nothing changes; own edits kept; deletions kept | | |
+| Restore on the other phone: tasks, rules, settings; own calendar choice kept | | |
+| Time to make / open a backup | | |
+| Messages not in the backup | | |
+| Drive overwrite of the same file | | |
 | Problems seen | | |

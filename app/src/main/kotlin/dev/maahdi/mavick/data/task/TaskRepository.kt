@@ -211,6 +211,33 @@ class TaskRepository(
         )
     }
 
+    /** Every task including deleted ones, for a backup. */
+    suspend fun everything(): List<TaskEntity> = dao.getAll()
+
+    /** What merging [incoming] would change, without changing anything. */
+    suspend fun previewMerge(incoming: Collection<TaskEntity>): MergePlan = TaskMerge.plan(dao.getAll(), incoming)
+
+    /**
+     * Merges [incoming] tasks (from a backup, later from the other phone) into this phone's: by task
+     * ID, the version edited last wins ([TaskMerge]). A winning version is stored as it is, with its
+     * own edit time, so merging again changes nothing. A reminder already in the past is not replayed.
+     * Alarms follow, and the listeners (calendar, widget) are told about each task that changed.
+     */
+    suspend fun merge(incoming: Collection<TaskEntity>): MergePlan {
+        val plan = lock.withLock {
+            val plan = TaskMerge.plan(dao.getAll(), incoming)
+            val now = now()
+            for (task in plan.toWrite) {
+                val stored = task.copy(remindAt = task.remindAt?.takeIf { it.isAfter(now) })
+                dao.upsert(stored)
+                syncAlarm(stored)
+            }
+            plan
+        }
+        plan.toWrite.forEach { notifyChanged(it.id) }
+        return plan
+    }
+
     /** Permanently removes tasks deleted more than 30 days ago. */
     suspend fun purgeOldDeleted(): Int = dao.purgeDeletedBefore(stamp().minus(DELETED_RETENTION_DAYS, ChronoUnit.DAYS))
 
