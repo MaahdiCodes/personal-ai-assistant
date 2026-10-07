@@ -112,6 +112,38 @@
                 android:value="conversations|alerting" />
         </service>
 
+        <!--
+            Phase 4: the home-screen widget with today's tasks. Not exported: Android's widget system
+            reaches it as the system. It draws plain views, so it needs no list service.
+        -->
+        <receiver
+            android:name=".widget.TasksWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tasks_widget_info" />
+        </receiver>
+
+        <!--
+            Phase 4: the "New task" Quick Settings tile, Mavick's second service. Only Android can bind
+            it (the permission below is held by the system alone), and only while the quick-settings
+            panel shows. Also on the build's service allow-list.
+        -->
+        <service
+            android:name=".widget.NewTaskTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_notification"
+            android:label="@string/tile_new_task"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Phone-friendly trimming of what libraries add (docs/PLAN.md §5.8). -->
 
         <!-- Room's cross-process service: Mavick is one process, so it is never needed. -->

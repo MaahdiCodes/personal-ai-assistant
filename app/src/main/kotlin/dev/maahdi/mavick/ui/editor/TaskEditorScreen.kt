@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -227,7 +228,7 @@ private fun EditorFields(
         )
         if (state.clashes.isNotEmpty()) {
             Text(
-                clashSentence(LocalContext.current.resources, state.clashes, zone, use24Hour),
+                clashSentence(LocalResources.current, state.clashes, zone, use24Hour),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag(CLASH_WARNING_TAG),

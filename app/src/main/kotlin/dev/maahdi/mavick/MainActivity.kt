@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
             }
             Intent.ACTION_PROCESS_TEXT -> openTextAsTask(subject = null, text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString())
             ReminderIntents.ACTION_OPEN_TASK -> ReminderIntents.taskIdOf(intent)?.let { navigation.openEditor(taskId = it) }
+            ReminderIntents.ACTION_NEW_TASK -> navigation.openEditor()
             ReminderIntents.ACTION_OPEN_SETTINGS -> navigation.openSettings()
             ReminderIntents.ACTION_OPEN_SUGGESTIONS -> navigation.openSuggestions()
         }

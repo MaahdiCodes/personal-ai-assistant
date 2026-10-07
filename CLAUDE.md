@@ -22,7 +22,7 @@ The rules that matter most:
   3. Commit and push `develop`.
 - **Permissions:** never add one without also updating `allowedPermissions` in
   `app/build.gradle.kts` and the plan. No `INTERNET` permission, ever. The notification listener
-  is the only allowed service (`allowedServices`).
+  and the Quick Settings tile are the only allowed services (`allowedServices`).
 - **Message reading is read-only:** never answer, open, dismiss or snooze another app's
   notification, or read the screen (no read receipts, no "online", no lost notifications).
   `checkReadOnlyNotifications` fails the build on the APIs that could; don't name them in

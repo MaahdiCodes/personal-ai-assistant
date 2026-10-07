@@ -57,7 +57,7 @@ class CalendarSyncTest {
             clock = { clock },
             dispatcher = Dispatchers.Unconfined,
         )
-        repository = TaskRepository(database.taskDao(), FakeReminderScheduler(), clock = { clock }, calendar = sync)
+        repository = TaskRepository(database.taskDao(), FakeReminderScheduler(), clock = { clock }, listeners = listOf(sync))
     }
 
     @After

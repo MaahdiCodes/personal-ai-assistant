@@ -1,8 +1,8 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phases 0–3 are coded. Phase 4 (calendar) is in progress: **parts 1 (tasks to the calendar) and 2 (clashes) are coded**, part 3 (widget, tile) is not started. 903 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far; no phase has had its full phone check yet, and Phase 4 has not run on a phone.
-> **Last updated:** 2026-10-07, after building Phase 4 part 2.
-> **Next step:** build Phase 4 part 3 (widget and tile), then the Phase 5 backup core. The user installs 0.5.0, runs the phone checks (PHONE_CHECKLIST.md, sections 9 and 10), imports the Gemma 3 1B model if not done, and fixes follow → accuracy check on real labelled messages (eval/README.md) → tags.
+> **Status:** Phases 0–3 are coded. **Phase 4 (calendar) is coded**: part 1 (tasks to the calendar), part 2 (clash warnings) and part 3 (home-screen widget and Quick Settings tile). 947 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far; no phase has had its full phone check yet, and Phase 4 has not run on a phone.
+> **Last updated:** 2026-10-07, after building Phase 4 part 3.
+> **Next step:** the Phase 5 backup core (encrypted backup file, restore with merge), then search and the Phase 6 merge. The user installs 0.5.0, runs the phone checks (PHONE_CHECKLIST.md, sections 9 and 10), imports the Gemma 3 1B model if not done, and fixes follow → accuracy check on real labelled messages (eval/README.md) → tags.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
 
@@ -21,7 +21,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 | 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done. Runs on the Pixel; full phone check pending. |
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail / Keep notifications, rules about what to read, Inbox | 🧪 Code and tests done (464 PC tests in total). Not yet on a phone. WhatsApp's own account switcher is not told apart yet (§5.1). |
 | 3. AI suggestions | On-device AI turning messages into suggested tasks | 🧪 Code and tests done (704 PC tests in total). Not yet on a phone: the AI runtime has never run on a device, and the accuracy targets need the user's labelled messages. |
-| 4. Calendar + planning | Calendar sync, clashes, widget | 🔨 Parts 1 (tasks with a time → a calendar you choose) and 2 (clash warnings) 🧪 code and tests done (903 PC tests in total), not yet on a phone. Part 3 (widget, Quick Settings tile) ⬜. Auto-add with Undo waits for the Phase 3 accuracy numbers. |
+| 4. Calendar + planning | Calendar sync, clashes, widget | 🧪 Parts 1 (tasks with a time → a calendar you choose), 2 (clash warnings) and 3 (home-screen widget, Quick Settings tile): code and tests done (947 PC tests in total), not yet on a phone. Auto-add with Undo waits for the Phase 3 accuracy numbers. |
 | 5. Backups + hardening | Encrypted Google Drive backups, reliability | ⬜ |
 | 6. Combined task list | One list across both phones | ⬜ |
 
@@ -56,6 +56,11 @@ This document is the single source of truth for the project. **§0 is the hand-o
   - a warning in the **editor**, live as the date or time changes.
 
   Free, declined, cancelled and all-day events never count, nor do Mavick's own events or other tasks. One calendar read serves all tasks (60-day window, from today); any calendar trouble means "no clashes", never an error. The task list shows at once and the warnings follow. No new permission, service or alarm. `CalendarGatewayDeviceTest` has three more on-phone tests, also not yet run.
+- **Phase 4 part 3 as built** (§5.9):
+  - **Home-screen widget** ("Mavick: today", add it from the launcher's widget list): the date, "2 tasks due today · 1 overdue", up to five lines (overdue first: "Overdue: Pay rent", "17:00  Call the bank"), "+N more", and a **+** that opens a new task. A line opens that task and the heading opens Mavick, both behind the app lock. It shows **titles by default; Settings › Home screen › Show task titles on the widget** hides them (only the counts remain), because a widget sits outside the app lock.
+  - It is plain `RemoteViews` with fixed lines (no list service) and `updatePeriodMillis = 0`: it is redrawn **only** when a task changes, when the titles switch changes, and on the existing wake-ups (app start, restart, time or time-zone change, the daily alarm). Between midnight and the next of those it can show yesterday: its date line makes that visible. With no widget on the home screen nothing is read and no database is opened. If the tasks can't be read (the phone has not been unlocked since a restart), it says "Open Mavick to see your tasks".
+  - **Quick Settings tile "New task"** (`NewTaskTileService`): Mavick's **second service**, allowed on purpose in `allowedServices` (protected by `BIND_QUICK_SETTINGS_TILE`). Android binds it only while the quick-settings panel shows. **You add it yourself:** pull down the quick settings, pencil/edit, drag "New task" in. Tapping opens a new task (on a locked phone Android asks to unlock first).
+  - `TaskRepository` now takes a list of `TaskChangeListener`s (the calendar and the widget), told after each saved change, each guarded so one failing never stops another or undoes the change.
 - **Versions:** app `versionCode 5`, `versionName 0.5.0`; database version 5.
 - **First phone test (Pixel 7 Pro, 2026-10-06):** the Gemma 3 1B model copied with `push-model.ps1` (SHA-256 matched) and imported in Settings. Two test messages each made a suggestion. Found: a suggestion's title copied the message's wording and ran on ("…is mentioned"), and the time in the title didn't match the sent text, so check the due time on the card. Not yet diagnosed; the accuracy check (eval/README.md) is the place to measure it. Do not change the prompt until the user has checked the due times.
 
@@ -75,10 +80,10 @@ This document is the single source of truth for the project. **§0 is the hand-o
 2. **Phone-check results:** record them in §7 and the `usage.ps1` numbers in §5.8. Fix anything that failed. The Poco (HyperOS) is the most likely to stop the listener or delay alarms (§6).
 3. **Tags:** `phase-1`, then `phase-2`, on `main`, and push them.
 4. **Phase 3 on the phone:** fix what the checks find. First suspects: R8 in the release build, test apps reading `/data/local/tmp`, constrained JSON with Gemma 3 1B. Tune the prompt and prefilter with the accuracy report until precision ≥ 85% and recall ≥ 70%, then tag `phase-3`. (Phase 4 was started before this, at the user's request, §10; auto-add stays out until these numbers are good.)
-5. **Phase 4 part 3: widget and Quick Settings tile** (§5.9; the widget shows titles, with a setting to hide them). Phone-check results for part 1 may change the design of these: look at them first.
+5. ~~Phase 4 part 3: widget and Quick Settings tile~~ (done 2026-10-07; §5.9). Phone-check results for part 1 may change the design of these: look at them first.
 **Work that needs no phone** (the user wants these finished before the phone checks, 2026-10-07), in this order:
    1. ✅ Phase 4 part 2: clashes (§5.9), done 2026-10-07.
-   2. Phase 4 part 3: widget and Quick Settings tile (§5.9).
+   2. ✅ Phase 4 part 3 (done 2026-10-07): widget and Quick Settings tile (§5.9).
    3. Phase 5, the PC-testable core: the encrypted backup file (AES-256-GCM, password-derived key) and restore with merge by task UUID, newest `updatedAt` wins (§5.7 A). This is also the Phase 6 merge code. Whether Drive accepts background overwrites needs a phone, so it stays out.
    4. Phase 5: "ask my assistant", keyword search over tasks and saved messages first.
    5. Phase 6, the PC-testable core: merging two phones' task lists, including both changing the same task offline.
@@ -90,7 +95,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 1. `git fetch`, `git switch develop`, `git pull`. The local folder `E:\Personal\personal-ai-assistant` is already on `develop`.
 2. Read §0, then the sections for the phase being worked on.
 3. Check that the baseline passes:
-   - **Windows:** `.\scripts\test.ps1` (903 tests, Lint, permission and read-only checks).
+   - **Windows:** `.\scripts\test.ps1` (947 tests, Lint, permission and read-only checks).
    - **Linux or macOS:** `./gradlew :app:testDebugUnitTest :app:lintDebug :app:checkDebugPermissions :app:checkReleasePermissions :app:checkReadOnlyNotifications`. This needs JDK 17+ and an Android SDK with platform 36 and build-tools 36.1. The PowerShell scripts are Windows-only.
 4. Ask the user for anything in §0.2 that is still missing before starting work that depends on it.
 
@@ -165,7 +170,7 @@ CLAUDE.md                       Short pointer to this section for AI coding sess
 
 **Privacy and phone-light rules**
 - **Permissions:** never add one silently. Add it to the manifest, to `allowedPermissions` in `app/build.gradle.kts`, and to this plan (§5.6, §5.8), with the reason. The build fails otherwise. No `INTERNET` permission, ever.
-- **Services:** the notification listener is the only one (`allowedServices`, which also requires its protecting permission). Any other service fails the build.
+- **Services:** the notification listener (Phase 2) and the Quick Settings tile (Phase 4) are the only two (`allowedServices`, which also requires each one's protecting permission). Any other service fails the build.
 - **Message reading is read-only:** never answer, open, dismiss or snooze another app's notification, change Do Not Disturb, or read the screen. That would send read receipts, show you online, or lose notifications. `checkReadOnlyNotifications` fails the build on the APIs that could (§5.1). Don't name those APIs in code comments either: the check reads comments too.
 - **WorkManager:** its manifest adds the `WAKE_LOCK` and `FOREGROUND_SERVICE` permissions and a service. Prefer the existing alarms: message clean-up already rides on the daily alarm (`DailyChores`). If WorkManager is really needed (perhaps the Phase 3 AI queue), update both allow-lists and §5.8 on purpose.
 - **Background work:** no polling, no foreground service, no wake locks. Screens watch the database only while visible (`collectAsStateWithLifecycle` with `WhileSubscribed`).
@@ -531,7 +536,8 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 - [x] Allowed permissions (Phase 1): `POST_NOTIFICATIONS`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `USE_BIOMETRIC`, plus the AndroidX-internal broadcast permission. Nothing else. Phase 2 added none: Notification access is granted by the user in Android settings, not requested. **Phase 4 added `READ_CALENDAR` and `WRITE_CALENDAR`** (§5.9), asked for only when the user switches "Add tasks with a time to my calendar" on, never at install.
 - [x] **Reading the calendar (Phase 4 part 2) is on-device and opt-in:** event titles are used in memory to warn about clashes and are never stored, logged or sent. No new permission.
 - [x] **Calendar events can leave the phone, through Google and not through Mavick** (Phase 4): if the chosen calendar syncs with Google, the Calendar app uploads each event's title and time. Off by default; the switch says so; events are private, with no notes. Message text never goes to the calendar (only a task's own title, which the user has accepted).
-- [x] Allowed services (Phase 2): only the notification listener, protected so that only Android can bind it. The build fails on any other service, or any accessibility or device-admin component.
+- [x] Allowed services: the notification listener (Phase 2) and the Quick Settings tile (Phase 4), each protected so that only Android can bind it. The build fails on any other service, or any accessibility or device-admin component.
+- [ ] The home-screen widget shows task titles outside the app lock, unless the user hides them in Settings › Home screen (Phase 4). The switch's text says so.
 
 **Data on the phone**
 - [x] SQLCipher database. Its 256-bit random key is encrypted with a non-exportable Keystore AES-GCM key and passed to SQLCipher as a raw key, so there is no slow key stretching (Phase 0; the on-phone tests confirm it).
@@ -584,7 +590,7 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 | CPU at startup | One small database open, off the main thread, with no slow key stretching and no emoji-font loading | `DatabaseKeyRepository` (raw key) and the startup trimming in `AndroidManifest.xml` |
 | Background, Phases 0–1 | **Nothing runs** except reminder alarms at their exact times and one morning-briefing alarm a day (Phase 1) | The release manifest declares 0 services. `usage.ps1` counts services, jobs and alarms. |
 | Background, Phase 2+ | With Notification access on, Android keeps the listener connected: **1 service**, woken only when a notification arrives (alerting and conversation ones by default). Other apps' notifications return at once, unread. No polling, no wake locks. Retention clean-up rides on the daily alarm (no extra job). | The build allows only that service. `usage.ps1` counts services, jobs and alarms, plus Android's battery stats. |
-| Background, Phase 4 | Nothing new: calendar events are written when a task changes and tidied on the existing wake-ups (app start, restart, time change, the daily alarm). The widget and tile (part 3, planned) will add a receiver and a service that Android binds only while the panel is open. | The service allow-list; `usage.ps1` |
+| Background, Phase 4 | Nothing new: calendar events are written when a task changes and tidied on the existing wake-ups (app start, restart, time change, the daily alarm). The widget (a receiver, no timer) and the tile (a service Android binds only while the quick-settings panel is open) add no background work: the widget is redrawn on task changes and the existing wake-ups. | The service allow-list; `usage.ps1` |
 | CPU for AI, Phase 3 | ≤ 2 threads, one message at a time. Pauses on low battery, Battery Saver, or a warm phone. | §5.3 Runtime. Measured on both phones. |
 
 **Rule:** every phase ends by running `.\scripts\usage.ps1` on both phones, and the numbers are recorded in this plan.
@@ -614,9 +620,13 @@ Phase 4 has three parts: **1. tasks to the calendar** (built), **2. clashes** (p
 - **Where it shows:** the **morning briefing** (`ReminderEngine` checks only today's tasks; clash lines come first and are counted; the lock-screen version says nothing about them), the **task list** (`TasksViewModel` shows the list at once and adds warnings when the calendar has been read; read again when the screen comes back and when the switch or the calendar choice changes), and the **editor** (`EditorViewModel` checks the chosen date and time, replacing an older check still running).
 - **Privacy:** event titles are read into memory only to be shown in the briefing, the list and the editor; they are not stored or logged.
 
-**Part 3: widget and Quick Settings tile (planned).**
-- **Widget:** a plain Android `AppWidgetProvider` with `RemoteViews`, **not Jetpack Glance**, which is built on WorkManager (§0.7: its permissions and service fail the build). Shows today's and overdue tasks and a "+" for quick-add; tapping a task opens it behind the app lock. It shows **titles by default**, with a setting to hide them (the user chose this, §10); a widget is on the home screen, outside the app lock. Updated when tasks change and by the daily alarm; no polling.
-- **Tile:** a `TileService` that opens quick-add. It is Mavick's **second service**, so `allowedServices` gets it on purpose, protected by `android.permission.BIND_QUICK_SETTINGS_TILE`. Android binds it only while the quick-settings panel is open.
+**Part 3: widget and Quick Settings tile (built).**
+- **Widget:** a plain Android `AppWidgetProvider` with `RemoteViews`, **not Jetpack Glance**, which is built on WorkManager (§0.7: its permissions and service fail the build). A list widget would need a `RemoteViewsService` (another service), so it has five fixed lines instead.
+  - `WidgetPlanner` (pure) picks the lines from the briefing's tasks: overdue first, then today's, at most five, the rest counted; with titles hidden, no lines and only the counts. `TasksWidgetRenderer` turns that into views, reusing the briefing's wording (`BriefingText`). `WidgetUpdater` redraws every widget of Mavick, one update at a time, each reading the newest tasks.
+  - **No timer:** `updatePeriodMillis = 0`. It is redrawn when a task changes (as a `TaskChangeListener`), when the titles switch changes, and on `DailyChores.cleanUp` (app start, restart, time or time-zone change, the daily alarm). Without a widget on the home screen it reads nothing. The date line shows when it was last drawn.
+  - Taps open Mavick through the same activity and app lock as a notification: a line opens its task (`ACTION_OPEN_TASK`), the heading opens the app, the "+" opens a new task (`ACTION_NEW_TASK`).
+  - **Privacy:** it shows **titles by default**, with a Settings switch to hide them (the user chose this, §10), because the widget is on the home screen, outside the app lock. The lock-screen is not a widget host (`widgetCategory = home_screen`).
+- **Tile:** `NewTaskTileService` opens a new task. It is Mavick's **second service**, so `allowedServices` has it on purpose, protected by `android.permission.BIND_QUICK_SETTINGS_TILE`. Android binds it only while the quick-settings panel is open; it holds no data and does no background work. Android doesn't add tiles by itself: the user drags it in.
 
 ---
 
@@ -749,16 +759,17 @@ Times assume part-time work, with Claude writing most of the code.
 | Part 1 on the phones (events appear in Google Calendar; checklist §10) | ⏳ |
 | Part 2: clashes in the briefing, on the task list and in the editor; Settings switch and calendar choice | ✅ Built and tested on the PC (overlap rules, the calendar read against a fake provider, the briefing, the notification, the list, the editor, Settings) |
 | Part 2 on the phones (checklist §10) | ⏳ |
-| Part 3: home-screen widget (titles shown, can be hidden) and Quick Settings tile | ⬜ |
+| Part 3: home-screen widget (titles shown, can be hidden) and Quick Settings tile | ✅ Built and tested on the PC (planner, the drawn views and their taps, updates with a fake widget host, no read without a widget, the manifest: not exported, no timer, tile protected, only two services) |
+| Part 3 on the phones (checklist §10) | ⏳ |
 | Auto-add with Undo | ⬜ Waits for the Phase 3 accuracy numbers |
-| PC tests + Lint | ✅ 903 tests, Lint: no issues |
-| Release APK | ✅ 25.6 MB (budget 30 MB). Permissions: the 4 earlier plus `READ_CALENDAR` and `WRITE_CALENDAR`. 1 service |
+| PC tests + Lint | ✅ 947 tests, Lint: no issues |
+| Release APK | ✅ 25.7 MB (budget 30 MB). Permissions: the 4 earlier plus `READ_CALENDAR` and `WRITE_CALENDAR`. 2 services (the listener and the tile) |
 
 ---
 
 ## 8. Testing strategy
 
-**As built (Phases 0–4 part 2): 903 PC tests, and the on-phone test classes listed below.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler, notifier and daily chores (same file), and the `task()` fixture (`sharedTest`).
+**As built (Phases 0–4): 947 PC tests, and the on-phone test classes listed below.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler, notifier and daily chores (same file), and the `task()` fixture (`sharedTest`).
 
 | Test class | Runs on | Covers |
 |---|---|---|
@@ -785,13 +796,18 @@ Times assume part-time work, with Claude writing most of the code.
 | `ClashServiceTest` | PC (Robolectric) | One read for many tasks and its range, off or no permission reads nothing, past and far tasks skipped, own events, chosen calendars (a gone calendar forgotten), failures mean no clashes, the editor's single slot |
 | `TasksViewModelTest` | PC (Robolectric) | Clashes reach the list state, the list shows before the calendar answers, reading again on return and on a settings change (and not on others), a calendar problem leaves the list working |
 | `TaskEditorScreenTest`, more in `EditorViewModelTest`, `ReminderEngineTest`, `SystemNotifierTest`, `ScreensTest`, `SettingsScreenTest` | PC (Robolectric + Compose) | The warning under the time, checks on open and on changing the date or time (a slow older answer never wins), clash lines first in the briefing and nothing on the lock screen, the row's warning, the clash switch and the calendar picker |
+| `WidgetPlannerTest` | PC (JVM) | Overdue first, five lines, the rest counted, titles hidden leaves only counts, empty day |
+| `TasksWidgetRendererTest` | PC (Robolectric) | The drawn views: date, summary, lines and their colours, "+N more", hidden titles appearing nowhere, empty and unreadable states, redrawing over an old draw, and what each tap opens |
+| `WidgetUpdaterTest` | PC (Robolectric, fake widget host) | Nothing read without a widget, every widget updated, following each kind of task change, titles hidden at once, a new day, an unreadable database and recovery, a failure never failing a task change |
+| `WidgetEntryTest` | PC (Robolectric) | The intents, the activity opening a new task or a task from them, the widget receiver not exported with no timer and home screen only, the tile protected and the only other service |
+| `TaskRepositoryListenersTest` | PC (Robolectric) | Every listener told once per kind of change and not on no-ops, a failing listener not stopping the others or the change, told after the save |
 | `CalendarSettingsViewModelTest`, `CalendarLinkDaoTest` | PC (Robolectric) | Permission and picker flow, choose and switch off, a slow refresh not overwriting a newer one, an unopenable database; the link table |
 | `EncryptedDatabaseTest`, `AndroidKeystoreKeyWrapperTest` | Phone | The database file is really encrypted; Keystore wrapping; wrong or lost keys |
 | `ReminderDeliveryTest` | Phone | A real exact alarm wakes Mavick and shows the notification |
 | `MessageCaptureDeviceTest` | Phone | Capture into the real encrypted database: a saved message is readable through Mavick but not in the file; an excluded one is nowhere |
 | `CalendarGatewayDeviceTest` | Phone | The real calendar storage, in a calendar of its own (an "On device" account that never syncs): listing, writing an event with its privacy settings, rewriting, removing, missing events |
 
-**Build checks** (run with every build and by `test.ps1`): the permission allow-list, the service allow-list (only the listener, with its protecting permission), no accessibility or device-admin components, the read-only check over all app code, `allowBackup=false`, the APK size budget, and Android Lint with no issues.
+**Build checks** (run with every build and by `test.ps1`): the permission allow-list, the service allow-list (only the listener and the tile, each with its protecting permission), no accessibility or device-admin components, the read-only check over all app code, `allowBackup=false`, the APK size budget, and Android Lint with no issues.
 
 **Manual:** [PHONE_CHECKLIST.md](PHONE_CHECKLIST.md) for each phase on both phones: restart, battery saver, time-zone change, force-stop, lock screen, Keep sharing, and `usage.ps1` numbers.
 
@@ -909,6 +925,8 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | Clash warnings are **off by default**, in their own switch, and reuse the calendar permission | They read calendar content; the user decides. Asked for the permission only when switching on |
 | A clash means a task's 30 minutes overlap a busy, timed event; free, declined, cancelled, all-day events, Mavick's own events and other tasks never count | All-day holidays and birthdays would clash with every task; tasks at 17:00 and 17:20 are not a meeting clash; Mavick's own events are copies of tasks |
 | Calendars checked: all visible by default, a picker narrows (as promised on 2026-10-07) | Clash detection with the work calendar is the point; the picker covers noisy calendars |
+| The widget is plain `RemoteViews` with five fixed lines and no timer; the tile is the second service (as decided on 2026-10-07) | A list widget needs another service; a timer wakes the phone. The date line shows staleness |
+| The calendar and the widget both follow tasks through one `TaskChangeListener` list in `TaskRepository` (replacing the calendar-only hook) | One mechanism, not two near copies; each listener guarded so none can break a change or another listener |
 | Warnings read the calendar when asked and keep nothing | No stale or stored calendar content; one read per request is cheap (60-day window) |
 
 **Still open**

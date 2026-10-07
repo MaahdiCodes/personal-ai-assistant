@@ -131,8 +131,11 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
         onFixCalendarPermission = { PhoneSettings.open(context, PhoneSettings.appInfo(context)) },
         onChange = { change: (AppSettings) -> AppSettings ->
             val wasSuggesting = container.settings.current.suggestionsEnabled
+            val titlesWereShown = container.settings.current.widgetShowTitles
             container.settings.update(change)
             container.reminderEngine.scheduleDailyAlarm()
+            // The widget shows or hides its titles at once.
+            if (titlesWereShown != container.settings.current.widgetShowTitles) scope.launch { container.widgets.update() }
             // Turned on: look at the messages waiting since.
             if (!wasSuggesting && container.settings.current.suggestionsEnabled) container.suggestionWorker.wake()
         },

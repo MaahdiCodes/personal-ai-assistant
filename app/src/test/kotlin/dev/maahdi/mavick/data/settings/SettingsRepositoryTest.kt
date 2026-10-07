@@ -152,6 +152,15 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `the widget shows titles at first, and hiding them survives a restart`() {
+        assertThat(SettingsRepository(preferences).current.widgetShowTitles).isTrue()
+
+        SettingsRepository(preferences).update { it.copy(widgetShowTitles = false) }
+
+        assertThat(SettingsRepository(preferences).current.widgetShowTitles).isFalse()
+    }
+
+    @Test
     fun `clash warnings are off at first and check every calendar`() {
         val settings = SettingsRepository(preferences).current
 

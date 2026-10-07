@@ -9,7 +9,7 @@ import java.time.ZoneId
 fun clashEventsLabel(resources: Resources, events: List<CalendarOccurrence>): String {
     val first = events.first().title.ifBlank { resources.getString(R.string.clash_untitled) }
     val others = events.size - 1
-    return if (others == 0) first else resources.getString(R.string.clash_and_more, first, others)
+    return if (others == 0) first else resources.getQuantityString(R.plurals.clash_and_more, others, first, others)
 }
 
 /** "Clashes with Dentist at 17:00": what a task row and the editor say. [events] is not empty. */

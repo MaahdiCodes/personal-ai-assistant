@@ -1,7 +1,7 @@
 package dev.maahdi.mavick.data.task
 
+import android.util.Log
 import dev.maahdi.mavick.calendar.Clash
-import dev.maahdi.mavick.calendar.TaskCalendar
 import dev.maahdi.mavick.reminders.ReminderScheduler
 import java.time.Clock
 import java.time.Instant
@@ -10,6 +10,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,8 +34,9 @@ data class Briefing(
  * Changes are serialized with a lock: a notification button and the app screen changing the same
  * task at the same moment can't overwrite each other.
  *
- * After a change is saved, [calendar] is told so the task's calendar event follows (Phase 4). That
- * happens after the lock is released, and a calendar problem never undoes or fails a change.
+ * After a change is saved, each of [listeners] is told, so the task's calendar event and the
+ * widget follow (Phase 4). That happens after the lock is released, and a listener's failure never
+ * undoes or fails the change, nor stops the other listeners.
  *
  * @param clock gives the current clock each time, so a time-zone change is picked up immediately.
  */
@@ -43,7 +45,7 @@ class TaskRepository(
     private val scheduler: ReminderScheduler,
     private val clock: () -> Clock,
     private val newId: () -> String = { UUID.randomUUID().toString() },
-    private val calendar: TaskCalendar = TaskCalendar.NONE,
+    private val listeners: List<TaskChangeListener> = emptyList(),
 ) {
     private val lock = Mutex()
 
@@ -78,7 +80,7 @@ class TaskRepository(
             syncAlarm(task)
             task
         }
-        calendar.taskChanged(task.id)
+        notifyChanged(task.id)
         return task
     }
 
@@ -146,7 +148,7 @@ class TaskRepository(
             dao.upsert(restored)
             syncAlarm(restored)
         }
-        calendar.taskChanged(snapshot.id)
+        notifyChanged(snapshot.id)
     }
 
     suspend fun snooze(id: String, minutes: Long): TaskEntity? = mutate(id) { task, now, stamp ->
@@ -224,8 +226,20 @@ class TaskRepository(
             syncAlarm(updated)
             updated
         }
-        calendar.taskChanged(id)
+        notifyChanged(id)
         return updated
+    }
+
+    private suspend fun notifyChanged(taskId: String) {
+        for (listener in listeners) {
+            try {
+                listener.taskChanged(taskId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "A task listener failed: ${e.javaClass.simpleName}")
+            }
+        }
     }
 
     private fun syncAlarm(task: TaskEntity) {
@@ -253,5 +267,7 @@ class TaskRepository(
 
         /** An alarm may arrive slightly early; within this many seconds it counts as on time. */
         const val EARLY_ALARM_TOLERANCE_SECONDS = 60L
+
+        private const val TAG = "Mavick"
     }
 }

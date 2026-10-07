@@ -246,6 +246,15 @@ fun SettingsScreen(
             )
             HorizontalDivider()
 
+            Text(stringResource(R.string.settings_widget), style = MaterialTheme.typography.titleMedium)
+            SwitchRow(
+                title = stringResource(R.string.settings_widget_titles),
+                summary = stringResource(R.string.settings_widget_titles_summary),
+                checked = settings.widgetShowTitles,
+                onCheckedChange = { shown -> onChange { it.copy(widgetShowTitles = shown) } },
+            )
+            HorizontalDivider()
+
             Text(stringResource(R.string.settings_keep), style = MaterialTheme.typography.titleMedium)
             Column(Modifier.fillMaxWidth().clickable(onClick = onImportKeep).padding(vertical = 4.dp)) {
                 Text(stringResource(R.string.settings_keep_import), style = MaterialTheme.typography.bodyLarge)

@@ -162,20 +162,22 @@ class SystemNotifier(
     override fun showBriefing(briefing: Briefing) {
         createChannels()
         val resources = context.resources
-        val summary = listOfNotNull(
-            briefing.today.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_due_today, it, it) },
-            briefing.overdue.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_overdue, it, it) },
-            briefing.suggestionsWaiting.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.suggestions_waiting, it, it) },
-            briefing.clashes.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_clashes, it, it) },
-        ).joinToString(" · ")
+        val summary = (
+            BriefingText.dueParts(resources, briefing.today.size, briefing.overdue.size) +
+                listOfNotNull(
+                    briefing.suggestionsWaiting.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.suggestions_waiting, it, it) },
+                    briefing.clashes.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_clashes, it, it) },
+                )
+            ).joinToString(" · ")
         val use24Hour = DateFormat.is24HourFormat(context)
         // Clashes first: they are the ones to act on.
         val clashLines = briefing.clashes.map { clash ->
             val time = clash.task.dueTime?.let { DueFormatter.time(it, use24Hour) }.orEmpty()
             context.getString(R.string.briefing_clash_line, time, clash.task.title, clashEventsLabel(resources, clash.events))
         }
-        val lines = clashLines + briefing.overdue.map { context.getString(R.string.briefing_overdue_line, it.title) } +
-            briefing.today.map { task -> task.dueTime?.let { "${DueFormatter.time(it, use24Hour)}  ${task.title}" } ?: task.title }
+        val lines = clashLines +
+            briefing.overdue.map { BriefingText.taskLine(resources, it, overdue = true, use24Hour = use24Hour) } +
+            briefing.today.map { BriefingText.taskLine(resources, it, overdue = false, use24Hour = use24Hour) }
         val style = Notification.InboxStyle().setSummaryText(summary)
         lines.take(MAX_BRIEFING_LINES).forEach { style.addLine(it) }
 

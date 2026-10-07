@@ -378,9 +378,27 @@
     <string name="calendar_missing">The calendar you chose is not on this phone any more. Choose another.</string>
     <string name="calendar_pick_title">Choose a calendar</string>
     <string name="calendar_pick_loading">Looking for calendars…</string>
+    <!-- Home-screen widget and Quick Settings tile (Phase 4, part 3) -->
+    <string name="widget_label">Mavick: today</string>
+    <string name="widget_description">Today\'s and overdue tasks, and a button for a new task</string>
+    <string name="widget_nothing_due">Nothing due today</string>
+    <string name="widget_open_to_see">Open Mavick to see your tasks</string>
+    <string name="widget_titles_hidden">Titles are hidden. Open Mavick to see them.</string>
+    <plurals name="widget_more">
+        <item quantity="one">+%d more</item>
+        <item quantity="other">+%d more</item>
+    </plurals>
+    <string name="tile_new_task">New task</string>
+    <string name="settings_widget">Home screen</string>
+    <string name="settings_widget_titles">Show task titles on the widget</string>
+    <string name="settings_widget_titles_summary">The widget sits on the home screen, outside the app lock, so anyone holding your unlocked phone can read the titles. Off shows only how many tasks are due. The Quick Settings tile needs no setting: add it by editing your quick settings.</string>
+
     <!-- Clashes between tasks and calendar events (Phase 4, part 2) -->
     <string name="clash_untitled">an event</string>
-    <string name="clash_and_more">%1$s and %2$d more</string>
+    <plurals name="clash_and_more">
+        <item quantity="one">%1$s and %2$d more</item>
+        <item quantity="other">%1$s and %2$d more</item>
+    </plurals>
     <string name="clash_with">Clashes with %1$s at %2$s</string>
     <string name="briefing_clash_line">Clash: %1$s %2$s, with %3$s</string>
     <plurals name="briefing_clashes">

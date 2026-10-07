@@ -17,6 +17,9 @@ object ReminderIntents {
     /** Opens Settings, where the Health section is (from a reading warning). */
     const val ACTION_OPEN_SETTINGS = "dev.maahdi.mavick.action.OPEN_SETTINGS"
 
+    /** Opens an empty new task (from the widget's "+" and the Quick Settings tile). */
+    const val ACTION_NEW_TASK = "dev.maahdi.mavick.action.NEW_TASK"
+
     /** Opens the suggested tasks (from the suggestions notification or the briefing). */
     const val ACTION_OPEN_SUGGESTIONS = "dev.maahdi.mavick.action.OPEN_SUGGESTIONS"
 

@@ -192,12 +192,14 @@ val allowedPermissions = setOf(
 
 /**
  * The only services Mavick may declare, each with the permission that must protect it. Mavick runs
- * nothing in the background except its notification listener, which only Android can bind
- * (docs/PLAN.md §5.8). A library adding a service (WorkManager, for example) fails the build.
+ * nothing in the background except its notification listener and, while the quick-settings panel
+ * shows, its tile; only Android can bind either (docs/PLAN.md §5.8). A library adding a service (WorkManager, for example) fails the build.
  */
 val allowedServices = mapOf(
     // Phase 2: reads WhatsApp, Messenger, Gmail and Keep notifications.
     "dev.maahdi.mavick.capture.MavickNotificationListener" to "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
+    // Phase 4: the "New task" tile in Quick Settings; Android binds it only while that panel shows.
+    "dev.maahdi.mavick.widget.NewTaskTileService" to "android.permission.BIND_QUICK_SETTINGS_TILE",
 )
 
 /** Powers Mavick must never have: reading the screen, or controlling the phone as its admin. */

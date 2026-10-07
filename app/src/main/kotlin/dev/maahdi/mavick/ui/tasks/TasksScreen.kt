@@ -46,7 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -167,7 +167,7 @@ private fun TaskList(
     onToggleDone: (TaskEntity) -> Unit,
     onOpenTask: (TaskEntity) -> Unit,
 ) {
-    val resources = LocalContext.current.resources
+    val resources = LocalResources.current
     LazyColumn(Modifier.fillMaxSize()) {
         sections.forEach { section ->
             section.title?.let { title ->

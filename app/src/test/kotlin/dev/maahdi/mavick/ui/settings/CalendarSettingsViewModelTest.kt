@@ -49,7 +49,7 @@ class CalendarSettingsViewModelTest {
         database = Room.inMemoryDatabaseBuilder(context, MavickDatabase::class.java).allowMainThreadQueries().build()
         settings = SettingsRepository(preferences)
         sync = CalendarSync(database.taskDao(), database.calendarLinkDao(), gateway, settings, { clock }, Dispatchers.Unconfined)
-        tasks = TaskRepository(database.taskDao(), FakeReminderScheduler(), { clock }, calendar = sync)
+        tasks = TaskRepository(database.taskDao(), FakeReminderScheduler(), { clock }, listeners = listOf(sync))
         opening = { sync }
     }
 

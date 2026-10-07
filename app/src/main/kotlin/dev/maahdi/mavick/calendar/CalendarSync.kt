@@ -4,6 +4,7 @@ import android.util.Log
 import dev.maahdi.mavick.data.calendar.CalendarLinkDao
 import dev.maahdi.mavick.data.calendar.CalendarLinkEntity
 import dev.maahdi.mavick.data.settings.SettingsRepository
+import dev.maahdi.mavick.data.task.TaskChangeListener
 import dev.maahdi.mavick.data.task.TaskDao
 import java.time.Clock
 import java.time.LocalDate
@@ -13,21 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-
-/** Told after a task changed, so a copy of it elsewhere (the calendar) can follow. */
-interface TaskCalendar {
-    /**
-     * Brings the task's calendar event in line with the task as it is now. Never throws: a calendar
-     * problem must not stop a task from being saved.
-     */
-    suspend fun taskChanged(taskId: String)
-
-    companion object {
-        val NONE: TaskCalendar = object : TaskCalendar {
-            override suspend fun taskChanged(taskId: String) = Unit
-        }
-    }
-}
 
 /**
  * Keeps the phone's calendar in step with the tasks (docs/PLAN.md §5.9). One-way: the task wins. An
@@ -46,9 +32,10 @@ class CalendarSync(
     private val settings: SettingsRepository,
     private val clock: () -> Clock,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : TaskCalendar {
+) : TaskChangeListener {
     private val lock = Mutex()
 
+    /** Brings the task's calendar event in line with the task as it is now. A calendar problem is only logged. */
     override suspend fun taskChanged(taskId: String) {
         attempt { syncTask(taskId) }
     }

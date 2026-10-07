@@ -351,6 +351,27 @@ in a calendar that shows on the phone.
 - [ ] Take the calendar permission away in App info: Settings says so, with **Fix**; no warning
       appears and nothing crashes.
 
+### Widget and Quick Settings tile (part 3)
+
+- [ ] Press and hold on the home screen › Widgets › **Mavick: today**: drag it out. It shows today's
+      date, e.g. "Mon 5 Oct", and "N tasks due today".
+- [ ] Today's tasks are listed as "17:00  Call the bank". An overdue one is red: "Overdue: …". More
+      than five show "+N more".
+- [ ] Add a task in Mavick, mark one done, delete one: the widget changes **within a second or two**,
+      with no refresh from you.
+- [ ] Tap a task line: Mavick opens that task (after the app lock). Tap the heading: Mavick opens. Tap
+      **+**: a new empty task opens; closing it returns to the widget's screen.
+- [ ] Settings › Home screen › switch **Show task titles on the widget** off: the lines go and the
+      widget says "Titles are hidden"; the counts stay. On again: titles return.
+- [ ] Restart the phone and **don't unlock it yet**, then unlock: the widget may say "Open Mavick to see
+      your tasks" for a moment, then shows the tasks (after the first unlock or opening Mavick).
+- [ ] Next morning (or change the date): the widget header may still show yesterday until Mavick's
+      morning alarm or any task change: **note whether it did, and how long it stayed.**
+- [ ] Quick Settings: pull down twice, tap the pencil, drag **New task** into the panel. Tap it: Mavick
+      opens a new task. With the phone locked, it asks to unlock first.
+- [ ] `.\scripts\usage.ps1 -Phone pixel`: services now 2 (the message listener and the tile, which
+      Android binds only while the panel shows); alarms and jobs unchanged.
+
 ### Results (Phase 4, part 1)
 
 | Item | Pixel 7 Pro | Poco X7 Pro |
@@ -365,5 +386,9 @@ in a calendar that shows on the phone.
 | Events show as private, no alarm, no notes | | |
 | Clash warning: list row, editor, briefing; free, all-day and declined events ignored | | |
 | Calendars to check, and permission off | | |
+| Widget: shows tasks, follows changes at once, taps, hide titles, "+N more" | | |
+| Widget after restart before unlock; how stale after midnight | | |
+| Quick Settings tile: add it, tap it, locked phone | | |
+| usage.ps1: services (expect 2), alarms, jobs | | |
 | On-phone calendar tests pass (`test.ps1 -OnPhone`) | | |
 | Problems seen | | |

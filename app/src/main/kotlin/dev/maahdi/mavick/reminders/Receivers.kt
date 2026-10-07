@@ -63,7 +63,7 @@ private fun engineOf(context: Context): ReminderEngine = (context.applicationCon
  * Does the receiver's work off the main thread while keeping the broadcast alive until it is
  * finished (Android allows about 10 seconds). Failures are logged without any task content.
  */
-private fun BroadcastReceiver.runInBackground(work: suspend () -> Unit) {
+internal fun BroadcastReceiver.runInBackground(work: suspend () -> Unit) {
     val pendingResult = goAsync()
     receiverScope.launch {
         try {

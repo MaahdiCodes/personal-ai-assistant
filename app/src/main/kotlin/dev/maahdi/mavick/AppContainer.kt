@@ -41,6 +41,7 @@ import dev.maahdi.mavick.reminders.ReminderScheduler
 import dev.maahdi.mavick.reminders.SystemNotifier
 import dev.maahdi.mavick.security.AppLock
 import dev.maahdi.mavick.time.WhenParser
+import dev.maahdi.mavick.widget.WidgetUpdater
 import java.io.File
 import java.time.Clock
 import kotlinx.coroutines.Dispatchers
@@ -91,7 +92,12 @@ class AppContainer(context: Context) {
         ClashService(calendarGateway, database.calendarLinkDao(), settings, clock)
     }
 
-    val tasks: TaskRepository by lazy { TaskRepository(database.taskDao(), reminderScheduler, clock, calendar = calendarSync) }
+    /** The home-screen widget (Phase 4, part 3). Opens the database only once a widget is on the home screen. */
+    val widgets: WidgetUpdater by lazy { WidgetUpdater(appContext, { date -> tasks.briefing(date) }, settings, clock) }
+
+    val tasks: TaskRepository by lazy {
+        TaskRepository(database.taskDao(), reminderScheduler, clock, listeners = listOf(calendarSync, widgets))
+    }
 
     val messages: MessageRepository by lazy { MessageRepository(database.messageDao()) }
 
@@ -218,8 +224,8 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * The daily alarm's chores: message reading's, then the calendar, then another chance for
-     * messages left waiting.
+     * The daily alarm's chores: message reading's, then the calendar and the widget, then another
+     * chance for messages left waiting.
      */
     private val dailyChores = object : DailyChores {
         override suspend fun cleanUp() {
@@ -228,6 +234,8 @@ class AppContainer(context: Context) {
             clearSuggestionsNotificationIfNone()
             // Runs after a restart or a time-zone change too, which is when events need rewriting.
             calendarSync.reconcileAll()
+            // A new day, a new time zone or a new clock: the widget shows today's tasks again.
+            widgets.update()
         }
 
         override suspend fun daily() {

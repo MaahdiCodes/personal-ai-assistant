@@ -451,6 +451,19 @@ class SettingsScreenTest {
         compose.onNodeWithText("4 tasks are in the calendar").assertDoesNotExist()
     }
 
+    // --- The widget ---
+
+    @Test
+    fun `the widget's titles are shown at first, with a warning about the app lock, and can be hidden`() {
+        show(working)
+
+        compose.onNodeWithText("Show task titles on the widget").performScrollTo().assertExists()
+        compose.onNodeWithText("outside the app lock", substring = true).assertExists()
+        compose.onNodeWithText("Show task titles on the widget").performClick()
+
+        assertThat(settings.widgetShowTitles).isFalse()
+    }
+
     // --- Clash warnings ---
 
     @Test
