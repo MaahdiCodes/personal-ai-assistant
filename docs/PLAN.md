@@ -1,8 +1,8 @@
 # Mavick — Personal AI Assistant — Plan
 
-> **Status:** Phases 0–3 are coded. Phase 4 (calendar) is in progress: **part 1 (tasks to the calendar) is coded**, parts 2 (clashes) and 3 (widget, tile) are not started. 812 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far; no phase has had its full phone check yet, and Phase 4 part 1 has not run on a phone.
-> **Last updated:** 2026-10-07, after building Phase 4 part 1.
-> **Next step:** build Phase 4 part 2 (clashes), then part 3 (widget and tile). The user installs 0.5.0, runs the phone checks (PHONE_CHECKLIST.md, sections 9 and 10), imports the Gemma 3 1B model if not done, and fixes follow → accuracy check on real labelled messages (eval/README.md) → tags.
+> **Status:** Phases 0–3 are coded. Phase 4 (calendar) is in progress: **parts 1 (tasks to the calendar) and 2 (clashes) are coded**, part 3 (widget, tile) is not started. 903 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far; no phase has had its full phone check yet, and Phase 4 has not run on a phone.
+> **Last updated:** 2026-10-07, after building Phase 4 part 2.
+> **Next step:** build Phase 4 part 3 (widget and tile), then the Phase 5 backup core. The user installs 0.5.0, runs the phone checks (PHONE_CHECKLIST.md, sections 9 and 10), imports the Gemma 3 1B model if not done, and fixes follow → accuracy check on real labelled messages (eval/README.md) → tags.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
 
@@ -21,7 +21,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 | 1. Tasks + reminders | Task lists, quick-add, reminders, morning briefing, app lock, Keep sharing | 🧪 Code and tests done. Runs on the Pixel; full phone check pending. |
 | 2. Message capture | Reading WhatsApp / Messenger / Gmail / Keep notifications, rules about what to read, Inbox | 🧪 Code and tests done (464 PC tests in total). Not yet on a phone. WhatsApp's own account switcher is not told apart yet (§5.1). |
 | 3. AI suggestions | On-device AI turning messages into suggested tasks | 🧪 Code and tests done (704 PC tests in total). Not yet on a phone: the AI runtime has never run on a device, and the accuracy targets need the user's labelled messages. |
-| 4. Calendar + planning | Calendar sync, clashes, widget | 🔨 Part 1 (tasks with a time → a calendar you choose) 🧪 code and tests done (812 PC tests in total), not yet on a phone. Part 2 (clashes) and part 3 (widget, Quick Settings tile) ⬜. Auto-add with Undo waits for the Phase 3 accuracy numbers. |
+| 4. Calendar + planning | Calendar sync, clashes, widget | 🔨 Parts 1 (tasks with a time → a calendar you choose) and 2 (clash warnings) 🧪 code and tests done (903 PC tests in total), not yet on a phone. Part 3 (widget, Quick Settings tile) ⬜. Auto-add with Undo waits for the Phase 3 accuracy numbers. |
 | 5. Backups + hardening | Encrypted Google Drive backups, reliability | ⬜ |
 | 6. Combined task list | One list across both phones | ⬜ |
 
@@ -50,6 +50,12 @@ This document is the single source of truth for the project. **§0 is the hand-o
   - Database version 5: `calendar_link` (task → event on this phone), no foreign key.
   - **If the chosen calendar syncs with Google, the Calendar app uploads the events** (§5.6). Settings says so.
   - On-phone test `CalendarGatewayDeviceTest` (a calendar of its own in an "On device" account) is written and compiles; it has **not been run** (no phone was connected).
+- **Phase 4 part 2 as built** (§5.9): **Settings › Calendar › Warn me about clashes** (off by default; asks for the same calendar permission; **Calendars to check** narrows it, none ticked means every calendar shown in the Calendar app). With it on, Mavick reads the calendar's events (`CalendarContract.Instances`, read-only) and a timed task that overlaps a busy, timed event gets:
+  - a line in the **morning briefing** ("Clash: 17:00 Call the bank, with Dentist"), first in the list, counted in its summary;
+  - a red warning line on its **row** in the task lists ("Clashes with Dentist at 17:00");
+  - a warning in the **editor**, live as the date or time changes.
+
+  Free, declined, cancelled and all-day events never count, nor do Mavick's own events or other tasks. One calendar read serves all tasks (60-day window, from today); any calendar trouble means "no clashes", never an error. The task list shows at once and the warnings follow. No new permission, service or alarm. `CalendarGatewayDeviceTest` has three more on-phone tests, also not yet run.
 - **Versions:** app `versionCode 5`, `versionName 0.5.0`; database version 5.
 - **First phone test (Pixel 7 Pro, 2026-10-06):** the Gemma 3 1B model copied with `push-model.ps1` (SHA-256 matched) and imported in Settings. Two test messages each made a suggestion. Found: a suggestion's title copied the message's wording and ran on ("…is mentioned"), and the time in the title didn't match the sent text, so check the due time on the card. Not yet diagnosed; the accuracy check (eval/README.md) is the place to measure it. Do not change the prompt until the user has checked the due times.
 
@@ -69,9 +75,9 @@ This document is the single source of truth for the project. **§0 is the hand-o
 2. **Phone-check results:** record them in §7 and the `usage.ps1` numbers in §5.8. Fix anything that failed. The Poco (HyperOS) is the most likely to stop the listener or delay alarms (§6).
 3. **Tags:** `phase-1`, then `phase-2`, on `main`, and push them.
 4. **Phase 3 on the phone:** fix what the checks find. First suspects: R8 in the release build, test apps reading `/data/local/tmp`, constrained JSON with Gemma 3 1B. Tune the prompt and prefilter with the accuracy report until precision ≥ 85% and recall ≥ 70%, then tag `phase-3`. (Phase 4 was started before this, at the user's request, §10; auto-add stays out until these numbers are good.)
-5. **Phase 4 part 2: clashes** (§5.9): read the calendar's events for a day, find timed tasks that overlap, a line in the briefing and a warning on the task. Then **part 3: widget and Quick Settings tile** (the widget shows titles, with a setting to hide them). Phone-check results for part 1 may change the design of these: look at them first.
+5. **Phase 4 part 3: widget and Quick Settings tile** (§5.9; the widget shows titles, with a setting to hide them). Phone-check results for part 1 may change the design of these: look at them first.
 **Work that needs no phone** (the user wants these finished before the phone checks, 2026-10-07), in this order:
-   1. Phase 4 part 2: clashes (§5.9).
+   1. ✅ Phase 4 part 2: clashes (§5.9), done 2026-10-07.
    2. Phase 4 part 3: widget and Quick Settings tile (§5.9).
    3. Phase 5, the PC-testable core: the encrypted backup file (AES-256-GCM, password-derived key) and restore with merge by task UUID, newest `updatedAt` wins (§5.7 A). This is also the Phase 6 merge code. Whether Drive accepts background overwrites needs a phone, so it stays out.
    4. Phase 5: "ask my assistant", keyword search over tasks and saved messages first.
@@ -84,7 +90,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 1. `git fetch`, `git switch develop`, `git pull`. The local folder `E:\Personal\personal-ai-assistant` is already on `develop`.
 2. Read §0, then the sections for the phase being worked on.
 3. Check that the baseline passes:
-   - **Windows:** `.\scripts\test.ps1` (812 tests, Lint, permission and read-only checks).
+   - **Windows:** `.\scripts\test.ps1` (903 tests, Lint, permission and read-only checks).
    - **Linux or macOS:** `./gradlew :app:testDebugUnitTest :app:lintDebug :app:checkDebugPermissions :app:checkReleasePermissions :app:checkReadOnlyNotifications`. This needs JDK 17+ and an Android SDK with platform 36 and build-tools 36.1. The PowerShell scripts are Windows-only.
 4. Ask the user for anything in §0.2 that is still missing before starting work that depends on it.
 
@@ -504,7 +510,7 @@ Table `exclusion_rule` (Phase 2): `id` (UUID), `type` (`ACCOUNT`, `CHAT`, `SENDE
 
 Table `health_event` (Phase 2): `id`, `type` (`LISTENER_CONNECTED`, `LISTENER_DISCONNECTED`), `at`. **No message content**; kept 30 days.
 
-**Settings** are not in the database: SharedPreferences file `settings` (briefing on and its time, default 08:00; app lock, default on; work days, default Sunday–Thursday; date order, default day/month; whether notification permission was already requested; per app: reading on and its mode; the pause; message retention, default 14 days; reading warning, default 1 day; Xiaomi Autostart confirmed; default rules added; suggestions on; the calendar: on or off (default off), the chosen calendar's ID and name; the switch can't be on without a calendar). **Capture status** (counts and times only) is the SharedPreferences file `capture_status`.
+**Settings** are not in the database: SharedPreferences file `settings` (briefing on and its time, default 08:00; app lock, default on; work days, default Sunday–Thursday; date order, default day/month; whether notification permission was already requested; per app: reading on and its mode; the pause; message retention, default 14 days; reading warning, default 1 day; Xiaomi Autostart confirmed; default rules added; suggestions on; the calendar: on or off (default off), the chosen calendar's ID and name; the switch can't be on without a calendar; clash warnings on or off (default off) and the calendars to check, none meaning all). **Capture status** (counts and times only) is the SharedPreferences file `capture_status`.
 
 Table `calendar_link` (Phase 4, database version 5): `taskId` (primary key), `calendarId`, `eventId`, `fingerprint` (a SHA-256 of the title, start, end and time zone last written). **This phone only:** event IDs mean nothing on another phone, so it is never part of a backup or sync. No foreign key, on purpose (§5.9).
 
@@ -523,6 +529,7 @@ Each task keeps a short `sourceExcerpt`, so deleting old messages never breaks a
 - [x] No analytics, crash-reporting or ad SDKs.
 - [x] `allowBackup="false"` plus data-extraction rules that exclude everything, so nothing goes to Google cloud backup or phone-to-phone transfer (Phase 0).
 - [x] Allowed permissions (Phase 1): `POST_NOTIFICATIONS`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `USE_BIOMETRIC`, plus the AndroidX-internal broadcast permission. Nothing else. Phase 2 added none: Notification access is granted by the user in Android settings, not requested. **Phase 4 added `READ_CALENDAR` and `WRITE_CALENDAR`** (§5.9), asked for only when the user switches "Add tasks with a time to my calendar" on, never at install.
+- [x] **Reading the calendar (Phase 4 part 2) is on-device and opt-in:** event titles are used in memory to warn about clashes and are never stored, logged or sent. No new permission.
 - [x] **Calendar events can leave the phone, through Google and not through Mavick** (Phase 4): if the chosen calendar syncs with Google, the Calendar app uploads each event's title and time. Off by default; the switch says so; events are private, with no notes. Message text never goes to the calendar (only a task's own title, which the user has accepted).
 - [x] Allowed services (Phase 2): only the notification listener, protected so that only Android can bind it. The build fails on any other service, or any accessibility or device-admin component.
 
@@ -600,7 +607,12 @@ Phase 4 has three parts: **1. tasks to the calendar** (built), **2. clashes** (p
 - **Problems:** without the permission (never given, or taken away) nothing is tried and links stay, so a later reconcile removes stale events; Settings says so, with **Fix** (App info). A chosen calendar that is gone says so, with **Change**. One task's failure doesn't stop the others; the permission being off stops the run at once. Only the kind of problem is logged (`NO_PERMISSION`, `UNAVAILABLE`), never a title.
 - **Privacy:** Mavick has no internet permission and still can't send anything. But if the chosen calendar syncs with Google, **the Calendar app uploads the event** (title and time). That is why the feature is off by default, and Settings says so beside the switch. The permissions are asked for only when the user switches it on.
 
-**Part 2: clashes (planned).** Read-only: `READ_CALENDAR` is already held. List calendar events (`CalendarContract.Instances`) in a day's range, from every visible calendar by default (a picker in Settings narrows it), leaving out Mavick's own events (by link). A timed task overlapping an event is a clash: a line in the morning briefing, a warning on the task in the lists and the editor. Pure overlap logic with tests; the briefing and the lists read the calendar off the main thread.
+**Part 2: clashes (built).** Read-only, with the `READ_CALENDAR` permission part 1 already asks for. **Off by default** (it reads calendar content), switched on in Settings › Calendar › Warn me about clashes.
+- **What counts as a clash (`ClashFinder`, pure):** a task with a date and a time occupies 30 minutes from its time (like its event); it clashes with a calendar event that overlaps that span. Events that merely touch (one ends as the other starts) don't clash; an event with no length counts as one minute. **Left out:** all-day events (holidays, birthdays), events shown as *free*, declined by you or cancelled, Mavick's own events (by `calendar_link`; they are also written as free), and other tasks (two tasks at once are not a clash; only the calendar is).
+- **Which calendars:** every calendar shown in the Calendar app, or the ones ticked in Settings (`clashCalendarIds`; none ticked means all). A ticked calendar that no longer exists is forgotten; with none left, all are checked.
+- **Reading (`ClashService`):** one `Instances` query covers all the tasks asked about, from the earliest start to the latest end, for tasks from today on and within 60 days. Nothing is kept: it is worked out again when asked. A permission that is off, or any failure, means no clashes and no error on screen (only the kind of problem is logged).
+- **Where it shows:** the **morning briefing** (`ReminderEngine` checks only today's tasks; clash lines come first and are counted; the lock-screen version says nothing about them), the **task list** (`TasksViewModel` shows the list at once and adds warnings when the calendar has been read; read again when the screen comes back and when the switch or the calendar choice changes), and the **editor** (`EditorViewModel` checks the chosen date and time, replacing an older check still running).
+- **Privacy:** event titles are read into memory only to be shown in the briefing, the list and the editor; they are not stored or logged.
 
 **Part 3: widget and Quick Settings tile (planned).**
 - **Widget:** a plain Android `AppWidgetProvider` with `RemoteViews`, **not Jetpack Glance**, which is built on WorkManager (§0.7: its permissions and service fail the build). Shows today's and overdue tasks and a "+" for quick-add; tapping a task opens it behind the app lock. It shows **titles by default**, with a setting to hide them (the user chose this, §10); a widget is on the home screen, outside the app lock. Updated when tasks change and by the daily alarm; no polling.
@@ -735,17 +747,18 @@ Times assume part-time work, with Claude writing most of the code.
 | Calendar tidy-up on the existing wake-ups (restart, time-zone change, daily alarm) | ✅ No new alarm, job or service |
 | On-phone test against the real calendar storage (`CalendarGatewayDeviceTest`) | ⏳ Written, compiles, never run |
 | Part 1 on the phones (events appear in Google Calendar; checklist §10) | ⏳ |
-| Part 2: clashes in the briefing and on tasks | ⬜ |
+| Part 2: clashes in the briefing, on the task list and in the editor; Settings switch and calendar choice | ✅ Built and tested on the PC (overlap rules, the calendar read against a fake provider, the briefing, the notification, the list, the editor, Settings) |
+| Part 2 on the phones (checklist §10) | ⏳ |
 | Part 3: home-screen widget (titles shown, can be hidden) and Quick Settings tile | ⬜ |
 | Auto-add with Undo | ⬜ Waits for the Phase 3 accuracy numbers |
-| PC tests + Lint | ✅ 812 tests, Lint: no issues |
+| PC tests + Lint | ✅ 903 tests, Lint: no issues |
 | Release APK | ✅ 25.6 MB (budget 30 MB). Permissions: the 4 earlier plus `READ_CALENDAR` and `WRITE_CALENDAR`. 1 service |
 
 ---
 
 ## 8. Testing strategy
 
-**As built (Phases 0–4 part 1): 812 PC tests, and the on-phone test classes listed below.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler, notifier and daily chores (same file), and the `task()` fixture (`sharedTest`).
+**As built (Phases 0–4 part 2): 903 PC tests, and the on-phone test classes listed below.** Shared conventions: a fixed "now" of Monday 2026-10-05 10:00 in Asia/Dhaka (`MutableClock` in `testing/TestDoubles.kt`), fakes for the alarm scheduler, notifier and daily chores (same file), and the `task()` fixture (`sharedTest`).
 
 | Test class | Runs on | Covers |
 |---|---|---|
@@ -768,6 +781,10 @@ Times assume part-time work, with Claude writing most of the code.
 | `CalendarEventPolicyTest` | PC (JVM) | Which tasks get an event (open, dated and timed only), start and end in the phone's zone, daylight-saving gap and overlap, the fingerprint changing exactly when the event must be rewritten and never holding the title |
 | `CalendarSyncTest` | PC (Robolectric) | Through the real task repository, database and a fake calendar: write, rewrite, move, done and reopen, delete and undo, repeats, taking the time off, switching on (overdue skipped) and off (other events left alone), another calendar (even when the old one is gone), time-zone change, an event deleted in the Calendar app, a calendar problem never stopping a save, permission off (links kept, later tidy-up, purged tasks), one failure not stopping the rest |
 | `ContentResolverCalendarGatewayTest` | PC (Robolectric) | Against a fake calendar provider: which calendars are listed and in what order, the exact columns written (private, free, no alarm, nothing else), update and delete of a missing event, permission and provider failures, errors carrying only the problem's name |
+| `ClashFinderTest` | PC (JVM) | Overlap edges (touching, partial, covering, no length, backwards), all-day, free, own events, calendar choice, order, tasks without a time or finished, time zones, tasks never clash with each other |
+| `ClashServiceTest` | PC (Robolectric) | One read for many tasks and its range, off or no permission reads nothing, past and far tasks skipped, own events, chosen calendars (a gone calendar forgotten), failures mean no clashes, the editor's single slot |
+| `TasksViewModelTest` | PC (Robolectric) | Clashes reach the list state, the list shows before the calendar answers, reading again on return and on a settings change (and not on others), a calendar problem leaves the list working |
+| `TaskEditorScreenTest`, more in `EditorViewModelTest`, `ReminderEngineTest`, `SystemNotifierTest`, `ScreensTest`, `SettingsScreenTest` | PC (Robolectric + Compose) | The warning under the time, checks on open and on changing the date or time (a slow older answer never wins), clash lines first in the briefing and nothing on the lock screen, the row's warning, the clash switch and the calendar picker |
 | `CalendarSettingsViewModelTest`, `CalendarLinkDaoTest` | PC (Robolectric) | Permission and picker flow, choose and switch off, a slow refresh not overwriting a newer one, an unopenable database; the link table |
 | `EncryptedDatabaseTest`, `AndroidKeystoreKeyWrapperTest` | Phone | The database file is really encrypted; Keystore wrapping; wrong or lost keys |
 | `ReminderDeliveryTest` | Phone | A real exact alarm wakes Mavick and shows the notification |
@@ -889,6 +906,10 @@ Test fixtures are fake messages sent between your two phones, so no real convers
 | The widget will be a plain `AppWidgetProvider` with `RemoteViews`, not Jetpack Glance | Glance is built on WorkManager, whose permissions and service fail the build (§0.7) |
 | The Quick Settings tile will be a second service, allowed on purpose in `allowedServices` | Android binds it only while the quick-settings panel is open. Decided now, done in part 3 |
 | Version 0.5.0, database version 5 | New permissions and a new table: a distinct build to install |
+| Clash warnings are **off by default**, in their own switch, and reuse the calendar permission | They read calendar content; the user decides. Asked for the permission only when switching on |
+| A clash means a task's 30 minutes overlap a busy, timed event; free, declined, cancelled, all-day events, Mavick's own events and other tasks never count | All-day holidays and birthdays would clash with every task; tasks at 17:00 and 17:20 are not a meeting clash; Mavick's own events are copies of tasks |
+| Calendars checked: all visible by default, a picker narrows (as promised on 2026-10-07) | Clash detection with the work calendar is the point; the picker covers noisy calendars |
+| Warnings read the calendar when asked and keep nothing | No stale or stored calendar content; one read per request is cheap (60-day window) |
 
 **Still open**
 

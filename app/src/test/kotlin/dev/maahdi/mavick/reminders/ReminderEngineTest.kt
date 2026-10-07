@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import dev.maahdi.mavick.calendar.CalendarOccurrence
 import dev.maahdi.mavick.data.MavickDatabase
 import dev.maahdi.mavick.data.settings.SettingsRepository
 import dev.maahdi.mavick.data.task.TaskDraft
@@ -15,6 +16,7 @@ import dev.maahdi.mavick.testing.FakeNotifier
 import dev.maahdi.mavick.testing.FakeReminderScheduler
 import dev.maahdi.mavick.testing.MONDAY_10AM
 import dev.maahdi.mavick.testing.MutableClock
+import dev.maahdi.mavick.testing.TEST_ZONE
 import java.time.LocalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -223,6 +225,68 @@ class ReminderEngineTest {
         withSuggestions.onDailyAlarm()
 
         assertThat(notifier.briefings.single().suggestionsWaiting).isEqualTo(3)
+    }
+
+    private val dentist = CalendarOccurrence(
+        eventId = 1,
+        calendarId = 1,
+        title = "Dentist",
+        start = today.atTime(17, 0).atZone(TEST_ZONE).toInstant(),
+        end = today.atTime(18, 0).atZone(TEST_ZONE).toInstant(),
+        allDay = false,
+        busy = true,
+    )
+
+    @Test
+    fun `the briefing lists today's tasks that clash with the calendar`() = runTest {
+        val clashing = taskAt(LocalTime.of(17, 15), "Call the bank")
+        taskAt(LocalTime.of(19, 0), "Water the plants")
+        val withClashes = ReminderEngine(
+            tasks, notifier, scheduler, settings, clock = { clock }, chores = chores,
+            findClashes = { checked -> checked.filter { it.id == clashing.id }.associate { it.id to listOf(dentist) } },
+        )
+        clock.setLocal(today.atTime(8, 0))
+
+        withClashes.onDailyAlarm()
+
+        val briefing = notifier.briefings.single()
+        assertThat(briefing.clashes.map { it.task.id }).containsExactly(clashing.id)
+        assertThat(briefing.clashes.single().events).containsExactly(dentist)
+    }
+
+    @Test
+    fun `only today's tasks are checked for clashes`() = runTest {
+        val checked = mutableListOf<List<String>>()
+        taskAt(LocalTime.of(17, 15), "Today")
+        tasks.create(TaskDraft(title = "Tomorrow", dueDate = today.plusDays(1), dueTime = LocalTime.of(17, 0)))
+        tasks.create(TaskDraft(title = "Old", dueDate = today.minusDays(2), dueTime = LocalTime.of(9, 0)))
+        val withClashes = ReminderEngine(
+            tasks, notifier, scheduler, settings, clock = { clock }, chores = chores,
+            findClashes = { found -> checked += found.map { it.title }; emptyMap() },
+        )
+        clock.setLocal(today.atTime(8, 0))
+
+        withClashes.onDailyAlarm()
+
+        assertThat(checked).containsExactly(listOf("Today"))
+        assertThat(notifier.briefings.single().clashes).isEmpty()
+    }
+
+    @Test
+    fun `no briefing and no calendar read while the briefing is off`() = runTest {
+        settings.update { it.copy(briefingEnabled = false) }
+        var reads = 0
+        taskAt(LocalTime.of(17, 15))
+        val withClashes = ReminderEngine(
+            tasks, notifier, scheduler, settings, clock = { clock }, chores = chores,
+            findClashes = { reads++; emptyMap() },
+        )
+        clock.setLocal(today.atTime(8, 0))
+
+        withClashes.onDailyAlarm()
+
+        assertThat(notifier.briefings).isEmpty()
+        assertThat(reads).isEqualTo(0)
     }
 
     @Test

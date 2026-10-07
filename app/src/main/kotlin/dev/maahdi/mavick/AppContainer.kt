@@ -18,6 +18,7 @@ import dev.maahdi.mavick.ai.eval.EvalExport
 import dev.maahdi.mavick.ai.eval.EvalExportFile
 import dev.maahdi.mavick.calendar.CalendarGateway
 import dev.maahdi.mavick.calendar.CalendarSync
+import dev.maahdi.mavick.calendar.ClashService
 import dev.maahdi.mavick.calendar.ContentResolverCalendarGateway
 import dev.maahdi.mavick.capture.CaptureChores
 import dev.maahdi.mavick.capture.CaptureStatusStore
@@ -85,6 +86,11 @@ class AppContainer(context: Context) {
         CalendarSync(database.taskDao(), database.calendarLinkDao(), calendarGateway, settings, clock)
     }
 
+    /** Looks for tasks that overlap events in the calendar (Phase 4, part 2). */
+    val clashes: ClashService by lazy {
+        ClashService(calendarGateway, database.calendarLinkDao(), settings, clock)
+    }
+
     val tasks: TaskRepository by lazy { TaskRepository(database.taskDao(), reminderScheduler, clock, calendar = calendarSync) }
 
     val messages: MessageRepository by lazy { MessageRepository(database.messageDao()) }
@@ -113,6 +119,9 @@ class AppContainer(context: Context) {
 
     /** The calendar sync for screens, opened off the main thread (it needs the database). */
     suspend fun openCalendarSync(): CalendarSync = offMain { calendarSync }
+
+    /** The clash check for screens, opened off the main thread (it needs the database). */
+    suspend fun openClashes(): ClashService = offMain { clashes }
 
     /** Counts and times about suggestions; no content. */
     val aiStatus: AiStatusStore by lazy {
@@ -229,7 +238,16 @@ class AppContainer(context: Context) {
     }
 
     val reminderEngine: ReminderEngine by lazy {
-        ReminderEngine(tasks, notifier, reminderScheduler, settings, clock, dailyChores, countSuggestions = ::suggestionsForBriefing)
+        ReminderEngine(
+            tasks,
+            notifier,
+            reminderScheduler,
+            settings,
+            clock,
+            dailyChores,
+            countSuggestions = ::suggestionsForBriefing,
+            findClashes = clashes::clashesFor,
+        )
     }
 
     val appLock: AppLock by lazy {

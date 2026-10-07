@@ -1,5 +1,6 @@
 package dev.maahdi.mavick.ui.editor
 
+import dev.maahdi.mavick.calendar.CalendarOccurrence
 import dev.maahdi.mavick.data.task.TaskDraft
 import dev.maahdi.mavick.data.task.TaskEntity
 import dev.maahdi.mavick.data.task.TaskPriority
@@ -30,6 +31,8 @@ data class EditorState(
     val priority: TaskPriority = TaskPriority.NORMAL,
     val source: TaskSource = TaskSource.MANUAL,
     val sourceExcerpt: String? = null,
+    /** Calendar events that overlap the date and time chosen now (Phase 4); empty when none or not checked. */
+    val clashes: List<CalendarOccurrence> = emptyList(),
     val loading: Boolean = false,
     val missing: Boolean = false,
     val showTitleError: Boolean = false,

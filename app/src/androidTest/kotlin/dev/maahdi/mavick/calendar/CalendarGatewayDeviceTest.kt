@@ -139,6 +139,37 @@ class CalendarGatewayDeviceTest {
     }
 
     @Test
+    fun an_event_is_found_in_its_time_range_and_shows_as_free_because_Mavick_writes_free_events() {
+        val eventId = gateway.insert(calendarId, event)
+
+        val found = gateway.occurrences(event.start.minusSeconds(60), event.end.plusSeconds(60)).firstOrNull { it.eventId == eventId }
+
+        assertThat(found).isNotNull()
+        assertThat(found!!.calendarId).isEqualTo(calendarId)
+        assertThat(found.title).isEqualTo(event.title)
+        assertThat(found.start).isEqualTo(event.start)
+        assertThat(found.end).isEqualTo(event.end)
+        assertThat(found.allDay).isFalse()
+        assertThat(found.busy).isFalse()
+    }
+
+    @Test
+    fun an_event_outside_the_range_is_not_found() {
+        val eventId = gateway.insert(calendarId, event)
+
+        val found = gateway.occurrences(event.end.plusSeconds(60), event.end.plusSeconds(3600))
+
+        assertThat(found.map { it.eventId }).doesNotContain(eventId)
+    }
+
+    @Test
+    fun the_test_calendar_is_among_the_visible_calendars_and_takes_events() {
+        val listed = gateway.visibleCalendars().firstOrNull { it.id == calendarId }
+
+        assertThat(listed).isEqualTo(DeviceCalendar(calendarId, CALENDAR_NAME, ACCOUNT, writable = true))
+    }
+
+    @Test
     fun an_event_that_never_existed_is_not_updated_or_deleted() {
         assertThat(gateway.update(Long.MAX_VALUE, event)).isFalse()
         assertThat(gateway.delete(Long.MAX_VALUE)).isFalse()

@@ -25,11 +25,15 @@ data class CalendarSettingsState(
     val permissionGranted: Boolean = false,
     /** The calendars Mavick may write to; empty until loaded, and without the permission. */
     val calendars: List<DeviceCalendar> = emptyList(),
+    /** Every calendar shown in the Calendar app, for choosing which to check for clashes. */
+    val allCalendars: List<DeviceCalendar> = emptyList(),
     val loaded: Boolean = false,
     /** How many tasks have an event in the calendar now. */
     val eventCount: Int = 0,
     /** The calendar picker is open. */
     val picking: Boolean = false,
+    /** The picker for the calendars checked for clashes is open. */
+    val pickingChecked: Boolean = false,
     /** The user just refused the permission, so Settings says how to allow it. */
     val permissionDenied: Boolean = false,
     /** Events are being written or removed. */
@@ -62,12 +66,13 @@ class CalendarSettingsViewModel(
         refreshing?.cancel()
         return viewModelScope.launch {
             val granted = gateway.hasPermission()
-            val calendars = if (granted) loadCalendars() else emptyList()
+            val visible = if (granted) loadCalendars() else emptyList()
             val count = countEvents()
             mutableState.update {
                 it.copy(
                     permissionGranted = granted,
-                    calendars = calendars,
+                    calendars = visible.filter { calendar -> calendar.writable },
+                    allCalendars = visible,
                     loaded = true,
                     eventCount = count,
                     working = false,
@@ -101,6 +106,34 @@ class CalendarSettingsViewModel(
         refresh().join()
     }
 
+    /** The answer to the permission prompt asked for the clash warnings: on yes, they are switched on. */
+    fun onClashPermissionResult(granted: Boolean): Job {
+        if (granted) setClashCheck(true) else mutableState.update { it.copy(permissionDenied = true) }
+        return refresh()
+    }
+
+    /** Switches the warnings about clashes with the calendar on or off. */
+    fun setClashCheck(enabled: Boolean) {
+        mutableState.update { it.copy(permissionDenied = false) }
+        settings.update { it.copy(clashCheckEnabled = enabled) }
+    }
+
+    /** Opens the choice of calendars to check, with the calendars looked up fresh. */
+    fun openCheckPicker(): Job {
+        mutableState.update { it.copy(pickingChecked = true) }
+        return refresh()
+    }
+
+    fun closeCheckPicker() {
+        mutableState.update { it.copy(pickingChecked = false) }
+    }
+
+    /** Checks only [ids] for clashes; none means every calendar. */
+    fun setCheckedCalendars(ids: Set<Long>) {
+        settings.update { it.copy(clashCalendarIds = ids) }
+        closeCheckPicker()
+    }
+
     /** Switches the feature off and removes the events Mavick added. */
     fun turnOff(): Job = viewModelScope.launch {
         mutableState.update { it.copy(working = true) }
@@ -111,7 +144,7 @@ class CalendarSettingsViewModel(
 
     private suspend fun loadCalendars(): List<DeviceCalendar> = withContext(io) {
         try {
-            gateway.writableCalendars()
+            gateway.visibleCalendars()
         } catch (e: CalendarAccessException) {
             emptyList()
         }

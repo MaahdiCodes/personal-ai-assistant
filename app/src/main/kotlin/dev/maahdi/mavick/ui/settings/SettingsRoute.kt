@@ -87,6 +87,9 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
     val requestCalendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         calendarViewModel.onPermissionResult(results.isNotEmpty() && results.values.all { it })
     }
+    val requestClashPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        calendarViewModel.onClashPermissionResult(results.isNotEmpty() && results.values.all { it })
+    }
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val file = PickedFile.from(context.contentResolver, uri)
@@ -111,6 +114,16 @@ fun SettingsRoute(container: AppContainer, onOpenReading: () -> Unit, onOpenKeep
                 else -> requestCalendarPermission.launch(CalendarPermissions.REQUIRED)
             }
         },
+        onClashSwitch = { on ->
+            when {
+                !on -> calendarViewModel.setClashCheck(false)
+                calendar.permissionGranted -> calendarViewModel.setClashCheck(true)
+                else -> requestClashPermission.launch(CalendarPermissions.REQUIRED)
+            }
+        },
+        onChooseCheckedCalendars = calendarViewModel::openCheckPicker,
+        onCheckedCalendars = calendarViewModel::setCheckedCalendars,
+        onCloseCheckedPicker = calendarViewModel::closeCheckPicker,
         onChangeCalendar = { calendarViewModel.openPicker() },
         onPickCalendar = calendarViewModel::choose,
         onClosePicker = calendarViewModel::closePicker,

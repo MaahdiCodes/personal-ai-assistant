@@ -152,6 +152,44 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `clash warnings are off at first and check every calendar`() {
+        val settings = SettingsRepository(preferences).current
+
+        assertThat(settings.clashCheckEnabled).isFalse()
+        assertThat(settings.clashCalendarIds).isEmpty()
+    }
+
+    @Test
+    fun `the clash choices are saved and survive a restart`() {
+        SettingsRepository(preferences).update { it.copy(clashCheckEnabled = true, clashCalendarIds = setOf(7, 3)) }
+
+        val reloaded = SettingsRepository(preferences).current
+
+        assertThat(reloaded.clashCheckEnabled).isTrue()
+        assertThat(reloaded.clashCalendarIds).containsExactly(3L, 7L)
+    }
+
+    @Test
+    fun `choosing every calendar again clears the saved choice`() {
+        val repository = SettingsRepository(preferences)
+        repository.update { it.copy(clashCalendarIds = setOf(3)) }
+
+        repository.update { it.copy(clashCalendarIds = emptySet()) }
+
+        assertThat(SettingsRepository(preferences).current.clashCalendarIds).isEmpty()
+    }
+
+    @Test
+    fun `damaged clash calendar ids are left out`() {
+        preferences.edit().putString("clash_calendar_ids", "3,abc,-4,0,,9").commit()
+
+        assertThat(SettingsRepository(preferences).current.clashCalendarIds).containsExactly(3L, 9L)
+
+        preferences.edit().putString("clash_calendar_ids", "garbage").commit()
+        assertThat(SettingsRepository(preferences).current.clashCalendarIds).isEmpty()
+    }
+
+    @Test
     fun `a pause until resumed survives a restart, and resuming clears it`() {
         val repository = SettingsRepository(preferences)
         repository.update { it.copy(capturePause = CapturePause.UntilResumed) }

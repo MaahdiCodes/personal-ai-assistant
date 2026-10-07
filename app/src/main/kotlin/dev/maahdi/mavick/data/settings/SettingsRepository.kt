@@ -41,6 +41,10 @@ data class AppSettings(
     /** The chosen calendar's ID in the phone's calendar storage, and a name to show for it. */
     val calendarId: Long? = null,
     val calendarName: String? = null,
+    /** Warn when a task with a time overlaps a calendar event (Phase 4, part 2). Reads the calendar, so off at first. */
+    val clashCheckEnabled: Boolean = false,
+    /** The calendars to check for clashes; empty means every calendar shown in the Calendar app. */
+    val clashCalendarIds: Set<Long> = emptySet(),
 ) {
     fun captureFor(app: SourceApp): AppCapture = appCapture[app] ?: AppCapture()
 
@@ -111,6 +115,8 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             calendarEnabled = calendarId != null && preferences.getBoolean(KEY_CALENDAR_ENABLED, defaults.calendarEnabled),
             calendarId = calendarId,
             calendarName = preferences.getString(KEY_CALENDAR_NAME, null),
+            clashCheckEnabled = preferences.getBoolean(KEY_CLASH_ENABLED, defaults.clashCheckEnabled),
+            clashCalendarIds = parseIds(preferences.getString(KEY_CLASH_CALENDARS, null)),
         )
     }
 
@@ -140,8 +146,14 @@ class SettingsRepository(private val preferences: SharedPreferences) {
             putBoolean(KEY_CALENDAR_ENABLED, settings.calendarEnabled)
             if (settings.calendarId == null) remove(KEY_CALENDAR_ID) else putString(KEY_CALENDAR_ID, settings.calendarId.toString())
             if (settings.calendarName == null) remove(KEY_CALENDAR_NAME) else putString(KEY_CALENDAR_NAME, settings.calendarName)
+            putBoolean(KEY_CLASH_ENABLED, settings.clashCheckEnabled)
+            if (settings.clashCalendarIds.isEmpty()) remove(KEY_CLASH_CALENDARS) else putString(KEY_CLASH_CALENDARS, settings.clashCalendarIds.sorted().joinToString(","))
         }
     }
+
+    /** "3,7" as IDs. A damaged entry is left out; none left means "every calendar". */
+    private fun parseIds(text: String?): Set<Long> =
+        text?.split(',')?.mapNotNull { it.toLongOrNull()?.takeIf { id -> id > 0 } }?.toSet().orEmpty()
 
     private fun parseDays(text: String): Set<DayOfWeek>? {
         val days = text.split(',').map { name -> DayOfWeek.entries.firstOrNull { it.name == name } }
@@ -187,5 +199,7 @@ class SettingsRepository(private val preferences: SharedPreferences) {
         private const val KEY_CALENDAR_ENABLED = "calendar_enabled"
         private const val KEY_CALENDAR_ID = "calendar_id"
         private const val KEY_CALENDAR_NAME = "calendar_name"
+        private const val KEY_CLASH_ENABLED = "clash_check_enabled"
+        private const val KEY_CLASH_CALENDARS = "clash_calendar_ids"
     }
 }

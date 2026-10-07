@@ -3,8 +3,10 @@ package dev.maahdi.mavick.testing
 import dev.maahdi.mavick.calendar.CalendarAccessException
 import dev.maahdi.mavick.calendar.CalendarEvent
 import dev.maahdi.mavick.calendar.CalendarGateway
+import dev.maahdi.mavick.calendar.CalendarOccurrence
 import dev.maahdi.mavick.calendar.CalendarProblem
 import dev.maahdi.mavick.calendar.DeviceCalendar
+import java.time.Instant
 
 val PERSONAL_CALENDAR = DeviceCalendar(id = 1, name = "Personal", account = "me@example.com")
 val WORK_CALENDAR = DeviceCalendar(id = 2, name = "Work", account = "me@work.example")
@@ -21,6 +23,15 @@ class FakeCalendarGateway(var calendars: List<DeviceCalendar> = listOf(PERSONAL_
 
     var permission = true
 
+    /** The events in the calendar, as the Calendar app would list them (Phase 4, clashes). */
+    var agenda: List<CalendarOccurrence> = emptyList()
+
+    /** The time ranges asked for, in order. */
+    val occurrenceRequests = mutableListOf<Pair<Instant, Instant>>()
+
+    /** Makes reading events fail with this problem. */
+    var occurrencesFailure: CalendarProblem? = null
+
     /** Makes the list of calendars fail with this problem, while writing events still works. */
     var listFailure: CalendarProblem? = null
 
@@ -32,10 +43,19 @@ class FakeCalendarGateway(var calendars: List<DeviceCalendar> = listOf(PERSONAL_
 
     override fun hasPermission(): Boolean = permission
 
-    override fun writableCalendars(): List<DeviceCalendar> {
+    override fun writableCalendars(): List<DeviceCalendar> = visibleCalendars().filter { it.writable }
+
+    override fun visibleCalendars(): List<DeviceCalendar> {
         if (!permission) throw CalendarAccessException(CalendarProblem.NO_PERMISSION)
         listFailure?.let { throw CalendarAccessException(it) }
         return calendars
+    }
+
+    override fun occurrences(from: Instant, to: Instant): List<CalendarOccurrence> {
+        if (!permission) throw CalendarAccessException(CalendarProblem.NO_PERMISSION)
+        occurrencesFailure?.let { throw CalendarAccessException(it) }
+        occurrenceRequests += from to to
+        return agenda.filter { it.start.isBefore(to) && from.isBefore(maxOf(it.end, it.start.plusMillis(1))) }
     }
 
     override fun insert(calendarId: Long, event: CalendarEvent): Long {

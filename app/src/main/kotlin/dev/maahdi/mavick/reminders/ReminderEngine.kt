@@ -1,6 +1,9 @@
 package dev.maahdi.mavick.reminders
 
+import dev.maahdi.mavick.calendar.CalendarOccurrence
+import dev.maahdi.mavick.calendar.Clash
 import dev.maahdi.mavick.data.settings.SettingsRepository
+import dev.maahdi.mavick.data.task.TaskEntity
 import dev.maahdi.mavick.data.task.TaskRepository
 import java.time.Clock
 import java.time.LocalDate
@@ -17,6 +20,8 @@ class ReminderEngine(
     private val chores: DailyChores = DailyChores.NONE,
     /** Suggested tasks waiting for you (Phase 3), mentioned in the briefing. */
     private val countSuggestions: suspend () -> Int = { 0 },
+    /** Calendar events each task overlaps, by task ID (Phase 4); mentioned in the briefing. */
+    private val findClashes: suspend (List<TaskEntity>) -> Map<String, List<CalendarOccurrence>> = { emptyMap() },
 ) {
     private val resyncedThisProcess = AtomicBoolean(false)
 
@@ -62,14 +67,19 @@ class ReminderEngine(
 
     /**
      * The daily alarm went off: sets tomorrow's first, then the briefing (if on, and anything is
-     * due or suggested), then the chores.
+     * due or suggested, with any clash of today's tasks with the calendar), then the chores.
      */
     suspend fun onDailyAlarm() {
         // First, so nothing below can stop tomorrow's alarm. The minute's margin keeps an alarm
         // that fires a moment early from setting itself again for today.
         scheduleDailyAlarm(notBefore = LocalDateTime.now(clock()).plusMinutes(1))
         if (settings.current.briefingEnabled) {
-            val briefing = tasks.briefing(LocalDate.now(clock())).copy(suggestionsWaiting = countSuggestions())
+            val plain = tasks.briefing(LocalDate.now(clock()))
+            val found = findClashes(plain.today)
+            val briefing = plain.copy(
+                suggestionsWaiting = countSuggestions(),
+                clashes = plain.today.mapNotNull { task -> found[task.id]?.let { Clash(task, it) } },
+            )
             if (!briefing.isEmpty) notifier.showBriefing(briefing)
         }
         chores.cleanUp()

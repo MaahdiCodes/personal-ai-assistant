@@ -378,5 +378,25 @@
     <string name="calendar_missing">The calendar you chose is not on this phone any more. Choose another.</string>
     <string name="calendar_pick_title">Choose a calendar</string>
     <string name="calendar_pick_loading">Looking for calendars…</string>
+    <!-- Clashes between tasks and calendar events (Phase 4, part 2) -->
+    <string name="clash_untitled">an event</string>
+    <string name="clash_and_more">%1$s and %2$d more</string>
+    <string name="clash_with">Clashes with %1$s at %2$s</string>
+    <string name="briefing_clash_line">Clash: %1$s %2$s, with %3$s</string>
+    <plurals name="briefing_clashes">
+        <item quantity="one">%d clash with your calendar</item>
+        <item quantity="other">%d clashes with your calendar</item>
+    </plurals>
+    <string name="settings_clashes_switch">Warn me about clashes</string>
+    <string name="settings_clashes_summary">Mavick reads your calendar on this phone, and warns when a task with a time overlaps an event: in the morning briefing, on the task list and in the editor. Event titles are shown only there.</string>
+    <string name="clash_calendars">Calendars to check</string>
+    <string name="clash_calendars_all">Every calendar</string>
+    <plurals name="clash_calendars_some">
+        <item quantity="one">%d calendar</item>
+        <item quantity="other">%d calendars</item>
+    </plurals>
+    <string name="clash_pick_title">Check these calendars</string>
+    <string name="clash_pick_all">Every calendar shown in the Calendar app</string>
+    <string name="clash_pick_done">Done</string>
     <string name="calendar_pick_none">No calendar can take new events. Sign in to a Google account in Android\'s settings, or open the Calendar app once, then try again.</string>
 </resources>

@@ -45,12 +45,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.maahdi.mavick.AppContainer
 import dev.maahdi.mavick.R
+import dev.maahdi.mavick.calendar.clashSentence
 import dev.maahdi.mavick.data.task.TaskPriority
 import dev.maahdi.mavick.time.DueFormatter
 import dev.maahdi.mavick.ui.Destination
@@ -59,6 +61,7 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
@@ -77,6 +80,7 @@ fun EditorRoute(container: AppContainer, destination: Destination.Editor, onClos
         today = LocalDate.now(container.clock()),
         workDays = settings.workDays,
         use24Hour = DateFormat.is24HourFormat(LocalContext.current),
+        zone = container.clock().zone,
         onChange = viewModel::edit,
         onSave = { viewModel.save(onClose) },
         onDelete = { viewModel.delete(onClose) },
@@ -94,6 +98,7 @@ fun TaskEditorScreen(
     onSave: () -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit,
+    zone: ZoneId = ZoneId.systemDefault(),
 ) {
     var picker by remember { mutableStateOf(Picker.NONE) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -119,7 +124,7 @@ fun TaskEditorScreen(
         when {
             state.missing -> Text(stringResource(R.string.editor_task_missing), modifier = contentModifier.padding(24.dp))
             state.loading -> Text(stringResource(R.string.editor_loading), modifier = contentModifier.padding(24.dp))
-            else -> EditorFields(state, today, workDays, use24Hour, onChange, onPick = { picker = it }, onDelete = { confirmDelete = true }, contentModifier)
+            else -> EditorFields(state, today, workDays, use24Hour, zone, onChange, onPick = { picker = it }, onDelete = { confirmDelete = true }, contentModifier)
         }
     }
 
@@ -161,12 +166,15 @@ fun TaskEditorScreen(
 
 private enum class Picker { NONE, DATE, TIME, REMINDER }
 
+const val CLASH_WARNING_TAG = "editorClashWarning"
+
 @Composable
 private fun EditorFields(
     state: EditorState,
     today: LocalDate,
     workDays: Set<DayOfWeek>,
     use24Hour: Boolean,
+    zone: ZoneId,
     onChange: ((EditorState) -> EditorState) -> Unit,
     onPick: (Picker) -> Unit,
     onDelete: () -> Unit,
@@ -217,6 +225,14 @@ private fun EditorFields(
                 null
             },
         )
+        if (state.clashes.isNotEmpty()) {
+            Text(
+                clashSentence(LocalContext.current.resources, state.clashes, zone, use24Hour),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(CLASH_WARNING_TAG),
+            )
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.editor_reminder), style = MaterialTheme.typography.titleMedium)

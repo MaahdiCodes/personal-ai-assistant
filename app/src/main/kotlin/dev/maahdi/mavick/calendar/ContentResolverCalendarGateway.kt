@@ -6,8 +6,11 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.CalendarContract.Attendees
 import android.provider.CalendarContract.Calendars
 import android.provider.CalendarContract.Events
+import android.provider.CalendarContract.Instances
+import java.time.Instant
 
 /** The calendar permissions Mavick asks for when the user turns the feature on (one prompt for both). */
 object CalendarPermissions {
@@ -22,22 +25,49 @@ class ContentResolverCalendarGateway(private val context: Context) : CalendarGat
     override fun hasPermission(): Boolean =
         CalendarPermissions.REQUIRED.all { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
 
-    override fun writableCalendars(): List<DeviceCalendar> = guarded {
+    override fun visibleCalendars(): List<DeviceCalendar> = guarded {
         val calendars = mutableListOf<DeviceCalendar>()
         context.contentResolver.query(Calendars.CONTENT_URI, CALENDAR_COLUMNS, null, null, null)?.use { cursor ->
             while (cursor.moveToNext()) {
                 // Filtered here, not in SQL: there are only a handful of calendars.
-                val canAddEvents = cursor.getInt(ACCESS_LEVEL) >= Calendars.CAL_ACCESS_CONTRIBUTOR
-                if (canAddEvents && cursor.getInt(VISIBLE) == 1) {
-                    calendars += DeviceCalendar(
-                        id = cursor.getLong(ID),
-                        name = cursor.getString(NAME).orEmpty(),
-                        account = cursor.getString(ACCOUNT).orEmpty(),
-                    )
-                }
+                if (cursor.getInt(VISIBLE) != 1) continue
+                calendars += DeviceCalendar(
+                    id = cursor.getLong(ID),
+                    name = cursor.getString(NAME).orEmpty(),
+                    account = cursor.getString(ACCOUNT).orEmpty(),
+                    writable = cursor.getInt(ACCESS_LEVEL) >= Calendars.CAL_ACCESS_CONTRIBUTOR,
+                )
             }
         }
         calendars.sortedWith(compareBy({ it.account.lowercase() }, { it.name.lowercase() }, { it.id }))
+    }
+
+    override fun writableCalendars(): List<DeviceCalendar> = visibleCalendars().filter { it.writable }
+
+    override fun occurrences(from: Instant, to: Instant): List<CalendarOccurrence> = guarded {
+        val uri = Instances.CONTENT_URI.buildUpon().also {
+            ContentUris.appendId(it, from.toEpochMilli())
+            ContentUris.appendId(it, to.toEpochMilli())
+        }.build()
+        val found = mutableListOf<CalendarOccurrence>()
+        context.contentResolver.query(uri, INSTANCE_COLUMNS, null, null, null)?.use { cursor ->
+            while (cursor.moveToNext()) {
+                // Only events of calendars shown in the Calendar app, as the Calendar app does.
+                if (cursor.getInt(INSTANCE_VISIBLE) != 1) continue
+                found += CalendarOccurrence(
+                    eventId = cursor.getLong(INSTANCE_EVENT_ID),
+                    calendarId = cursor.getLong(INSTANCE_CALENDAR_ID),
+                    title = cursor.getString(INSTANCE_TITLE).orEmpty(),
+                    start = Instant.ofEpochMilli(cursor.getLong(INSTANCE_BEGIN)),
+                    end = Instant.ofEpochMilli(cursor.getLong(INSTANCE_END)),
+                    allDay = cursor.getInt(INSTANCE_ALL_DAY) == 1,
+                    busy = cursor.getInt(INSTANCE_AVAILABILITY) != Events.AVAILABILITY_FREE &&
+                        cursor.getInt(INSTANCE_SELF_STATUS) != Attendees.ATTENDEE_STATUS_DECLINED &&
+                        cursor.getInt(INSTANCE_STATUS) != Events.STATUS_CANCELED,
+                )
+            }
+        }
+        found
     }
 
     override fun insert(calendarId: Long, event: CalendarEvent): Long = guarded {
@@ -97,5 +127,28 @@ class ContentResolverCalendarGateway(private val context: Context) : CalendarGat
         const val ACCESS_LEVEL = 2
         const val VISIBLE = 3
         const val ACCOUNT = 4
+
+        val INSTANCE_COLUMNS = arrayOf(
+            Instances.EVENT_ID,
+            Instances.CALENDAR_ID,
+            Instances.TITLE,
+            Instances.BEGIN,
+            Instances.END,
+            Instances.ALL_DAY,
+            Instances.AVAILABILITY,
+            Instances.SELF_ATTENDEE_STATUS,
+            Instances.STATUS,
+            Instances.VISIBLE,
+        )
+        const val INSTANCE_EVENT_ID = 0
+        const val INSTANCE_CALENDAR_ID = 1
+        const val INSTANCE_TITLE = 2
+        const val INSTANCE_BEGIN = 3
+        const val INSTANCE_END = 4
+        const val INSTANCE_ALL_DAY = 5
+        const val INSTANCE_AVAILABILITY = 6
+        const val INSTANCE_SELF_STATUS = 7
+        const val INSTANCE_STATUS = 8
+        const val INSTANCE_VISIBLE = 9
     }
 }

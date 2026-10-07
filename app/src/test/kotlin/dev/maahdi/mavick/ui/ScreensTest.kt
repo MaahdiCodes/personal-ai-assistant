@@ -1,5 +1,10 @@
 package dev.maahdi.mavick.ui
 
+import dev.maahdi.mavick.data.task.TaskStatus
+import dev.maahdi.mavick.testing.TEST_ZONE
+import dev.maahdi.mavick.calendar.CalendarOccurrence
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -86,6 +91,69 @@ class ScreensTest {
 
         assertThat(toggled).isEqualTo(1)
         assertThat(opened).isEqualTo(1)
+    }
+
+    @Test
+    fun `a task row that clashes with the calendar says so, in its own line`() {
+        val call = task(title = "Call the bank", dueDate = today, dueTime = LocalTime.of(17, 0))
+        compose.setContent {
+            TaskRow(call, today, DEFAULT_WORK_DAYS, use24Hour = true, highlightDue = false, onToggleDone = {}, onClick = {}, clash = "Clashes with Dentist at 17:00")
+        }
+
+        compose.onNodeWithText("Today · 17:00").assertExists()
+        compose.onNodeWithText("Clashes with Dentist at 17:00").assertExists()
+    }
+
+    @Test
+    fun `a task row with a clash but nothing else still shows the clash`() {
+        val call = task(title = "Call the bank")
+        compose.setContent {
+            TaskRow(call, today, DEFAULT_WORK_DAYS, use24Hour = true, highlightDue = false, onToggleDone = {}, onClick = {}, clash = "Clashes with Dentist at 17:00")
+        }
+
+        compose.onNodeWithText("Clashes with Dentist at 17:00").assertExists()
+    }
+
+    @Test
+    fun `a finished task shows no clash`() {
+        val done = task(title = "Call the bank", dueDate = today, dueTime = LocalTime.of(17, 0), status = TaskStatus.DONE)
+        compose.setContent {
+            TaskRow(done, today, DEFAULT_WORK_DAYS, use24Hour = true, highlightDue = false, onToggleDone = {}, onClick = {}, clash = "Clashes with Dentist at 17:00")
+        }
+
+        compose.onNodeWithText("Clashes with Dentist at 17:00").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the task list shows each task's clash with the time of the event`() {
+        val call = task(title = "Call the bank", dueDate = today, dueTime = LocalTime.of(17, 15))
+        val dentist = CalendarOccurrence(
+            1, 1, "Dentist",
+            today.atTime(17, 0).atZone(TEST_ZONE).toInstant(), today.atTime(18, 0).atZone(TEST_ZONE).toInstant(),
+            allDay = false, busy = true,
+        )
+        val state = TasksUiState.build(open = listOf(call, task(title = "Buy milk", dueDate = today)), done = emptyList(), today = today, workDays = DEFAULT_WORK_DAYS, zone = TEST_ZONE)
+            .copy(clashes = mapOf(call.id to listOf(dentist)))
+        compose.setContent {
+            TasksScreen(
+                state = state,
+                use24Hour = true,
+                preview = { parser.parse(it, MONDAY_10AM) },
+                onQuickAdd = { true },
+                onToggleDone = {},
+                onOpenTask = {},
+                onNewTask = {},
+                onOpenSettings = {},
+                onOpenInbox = {},
+                onOpenSuggestions = {},
+                notificationsBlocked = false,
+                onFixNotifications = {},
+                snackbarHostState = SnackbarHostState(),
+            )
+        }
+
+        compose.onNodeWithText("Clashes with Dentist at 17:00").assertExists()
+        compose.onAllNodesWithText("Clashes with", substring = true).assertCountEquals(1)
     }
 
     @Test

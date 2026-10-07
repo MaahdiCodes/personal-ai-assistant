@@ -113,6 +113,10 @@ fun SettingsScreen(
     onPickCalendar: (DeviceCalendar) -> Unit,
     onClosePicker: () -> Unit,
     onFixCalendarPermission: () -> Unit,
+    onClashSwitch: (Boolean) -> Unit,
+    onChooseCheckedCalendars: () -> Unit,
+    onCheckedCalendars: (Set<Long>) -> Unit,
+    onCloseCheckedPicker: () -> Unit,
     onFixNotifications: () -> Unit,
     onFixBattery: () -> Unit,
     onFixNotificationAccess: () -> Unit,
@@ -235,6 +239,10 @@ fun SettingsScreen(
                 onPick = onPickCalendar,
                 onClosePicker = onClosePicker,
                 onFixPermission = onFixCalendarPermission,
+                onClashSwitch = onClashSwitch,
+                onChooseCheckedCalendars = onChooseCheckedCalendars,
+                onCheckedCalendars = onCheckedCalendars,
+                onCloseCheckedPicker = onCloseCheckedPicker,
             )
             HorizontalDivider()
 

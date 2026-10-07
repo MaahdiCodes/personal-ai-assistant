@@ -10,6 +10,7 @@ import android.graphics.drawable.Icon
 import android.text.format.DateFormat
 import dev.maahdi.mavick.MainActivity
 import dev.maahdi.mavick.R
+import dev.maahdi.mavick.calendar.clashEventsLabel
 import dev.maahdi.mavick.capture.ReadingState
 import dev.maahdi.mavick.data.task.Briefing
 import dev.maahdi.mavick.data.task.TaskEntity
@@ -165,9 +166,15 @@ class SystemNotifier(
             briefing.today.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_due_today, it, it) },
             briefing.overdue.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_overdue, it, it) },
             briefing.suggestionsWaiting.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.suggestions_waiting, it, it) },
+            briefing.clashes.size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.briefing_clashes, it, it) },
         ).joinToString(" · ")
         val use24Hour = DateFormat.is24HourFormat(context)
-        val lines = briefing.overdue.map { context.getString(R.string.briefing_overdue_line, it.title) } +
+        // Clashes first: they are the ones to act on.
+        val clashLines = briefing.clashes.map { clash ->
+            val time = clash.task.dueTime?.let { DueFormatter.time(it, use24Hour) }.orEmpty()
+            context.getString(R.string.briefing_clash_line, time, clash.task.title, clashEventsLabel(resources, clash.events))
+        }
+        val lines = clashLines + briefing.overdue.map { context.getString(R.string.briefing_overdue_line, it.title) } +
             briefing.today.map { task -> task.dueTime?.let { "${DueFormatter.time(it, use24Hour)}  ${task.title}" } ?: task.title }
         val style = Notification.InboxStyle().setSummaryText(summary)
         lines.take(MAX_BRIEFING_LINES).forEach { style.addLine(it) }

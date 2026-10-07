@@ -29,6 +29,13 @@ class FakeCalendarProvider : ContentProvider() {
     val calendarRows = mutableListOf<Map<String, Any?>>()
     val events = linkedMapOf<Long, ContentValues>()
 
+    /** Event occurrences as column name to value, handed out for any range asked for. */
+    val instanceRows = mutableListOf<Map<String, Any?>>()
+
+    /** The address of the last occurrences query: instances/when/(begin)/(end). */
+    var lastInstancesUri: Uri? = null
+        private set
+
     /** Makes every call throw this. */
     var failure: RuntimeException? = null
     var insertReturnsNull = false
@@ -41,7 +48,10 @@ class FakeCalendarProvider : ContentProvider() {
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor {
         enter()
         val columns = requireNotNull(projection)
-        return MatrixCursor(columns).apply { calendarRows.forEach { row -> addRow(columns.map { row[it] }) } }
+        val isInstances = uri.pathSegments.firstOrNull() == "instances"
+        if (isInstances) lastInstancesUri = uri
+        val rows = if (isInstances) instanceRows else calendarRows
+        return MatrixCursor(columns).apply { rows.forEach { row -> addRow(columns.map { row[it] }) } }
     }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
@@ -104,6 +114,33 @@ class ContentResolverCalendarGatewayTest {
 
     private fun stored() = provider.events.values.single()
 
+    private fun occurrence(
+        eventId: Long = 1,
+        calendarId: Long = 3,
+        title: String? = "Dentist",
+        begin: Long = 1_000,
+        end: Long = 2_000,
+        allDay: Int = 0,
+        availability: Int = Events.AVAILABILITY_BUSY,
+        selfStatus: Int = CalendarContract.Attendees.ATTENDEE_STATUS_NONE,
+        status: Int = Events.STATUS_CONFIRMED,
+        visible: Int = 1,
+    ) = mapOf<String, Any?>(
+        CalendarContract.Instances.EVENT_ID to eventId,
+        CalendarContract.Instances.CALENDAR_ID to calendarId,
+        CalendarContract.Instances.TITLE to title,
+        CalendarContract.Instances.BEGIN to begin,
+        CalendarContract.Instances.END to end,
+        CalendarContract.Instances.ALL_DAY to allDay,
+        CalendarContract.Instances.AVAILABILITY to availability,
+        CalendarContract.Instances.SELF_ATTENDEE_STATUS to selfStatus,
+        CalendarContract.Instances.STATUS to status,
+        CalendarContract.Instances.VISIBLE to visible,
+    )
+
+    private val from = Instant.parse("2026-10-08T00:00:00Z")
+    private val to = Instant.parse("2026-10-09T00:00:00Z")
+
     // --- Permission ---
 
     @Test
@@ -155,8 +192,90 @@ class ContentResolverCalendarGatewayTest {
     }
 
     @Test
+    fun `every visible calendar is listed with whether it takes new events`() {
+        provider.calendarRows += calendar(1, "Personal", "me@gmail.com")
+        provider.calendarRows += calendar(2, "Holidays", "holidays@group", access = Calendars.CAL_ACCESS_READ)
+        provider.calendarRows += calendar(3, "Hidden", "me@gmail.com", visible = 0)
+
+        val calendars = gateway.visibleCalendars()
+
+        assertThat(calendars).containsExactly(
+            // By account: holidays@group comes before me@gmail.com.
+            DeviceCalendar(2, "Holidays", "holidays@group", writable = false),
+            DeviceCalendar(1, "Personal", "me@gmail.com", writable = true),
+        ).inOrder()
+    }
+
+    @Test
     fun `a phone with no calendars lists none`() {
         assertThat(gateway.writableCalendars()).isEmpty()
+    }
+
+    // --- Reading events ---
+
+    @Test
+    fun `events are asked for between the two moments`() {
+        gateway.occurrences(from, to)
+
+        val segments = provider.lastInstancesUri!!.pathSegments
+        assertThat(segments.takeLast(2)).containsExactly(from.toEpochMilli().toString(), to.toEpochMilli().toString()).inOrder()
+    }
+
+    @Test
+    fun `an event is read with its calendar title and times`() {
+        provider.instanceRows += occurrence(eventId = 8, calendarId = 3, title = "Dentist", begin = 1_000, end = 2_000)
+
+        assertThat(gateway.occurrences(from, to)).containsExactly(
+            CalendarOccurrence(8, 3, "Dentist", Instant.ofEpochMilli(1_000), Instant.ofEpochMilli(2_000), allDay = false, busy = true),
+        )
+    }
+
+    @Test
+    fun `an event without a title reads as an empty title`() {
+        provider.instanceRows += occurrence(title = null)
+
+        assertThat(gateway.occurrences(from, to).single().title).isEmpty()
+    }
+
+    @Test
+    fun `all-day events are marked`() {
+        provider.instanceRows += occurrence(allDay = 1)
+
+        assertThat(gateway.occurrences(from, to).single().allDay).isTrue()
+    }
+
+    @Test
+    fun `an event is busy unless it is shown as free, declined by you or cancelled`() {
+        provider.instanceRows += occurrence(eventId = 1)
+        provider.instanceRows += occurrence(eventId = 2, availability = Events.AVAILABILITY_FREE)
+        provider.instanceRows += occurrence(eventId = 3, selfStatus = CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED)
+        provider.instanceRows += occurrence(eventId = 4, status = Events.STATUS_CANCELED)
+        provider.instanceRows += occurrence(eventId = 5, availability = Events.AVAILABILITY_TENTATIVE)
+        provider.instanceRows += occurrence(eventId = 6, selfStatus = CalendarContract.Attendees.ATTENDEE_STATUS_TENTATIVE)
+
+        val busy = gateway.occurrences(from, to).associate { it.eventId to it.busy }
+
+        assertThat(busy).containsExactly(1L, true, 2L, false, 3L, false, 4L, false, 5L, true, 6L, true)
+    }
+
+    @Test
+    fun `events of calendars hidden in the Calendar app are left out`() {
+        provider.instanceRows += occurrence(eventId = 1, visible = 1)
+        provider.instanceRows += occurrence(eventId = 2, visible = 0)
+
+        assertThat(gateway.occurrences(from, to).map { it.eventId }).containsExactly(1L)
+    }
+
+    @Test
+    fun `reading events needs the permission and turns storage failures into problems`() {
+        provider.failure = IllegalStateException("broken")
+        val unavailable = runCatching { gateway.occurrences(from, to) }.exceptionOrNull() as CalendarAccessException
+        assertThat(unavailable.problem).isEqualTo(CalendarProblem.UNAVAILABLE)
+
+        provider.failure = null
+        shadowOf(application).denyPermissions(Manifest.permission.READ_CALENDAR)
+        val refused = runCatching { gateway.occurrences(from, to) }.exceptionOrNull() as CalendarAccessException
+        assertThat(refused.problem).isEqualTo(CalendarProblem.NO_PERMISSION)
     }
 
     // --- Writing events ---

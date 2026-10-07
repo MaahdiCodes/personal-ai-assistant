@@ -1,5 +1,6 @@
 package dev.maahdi.mavick.data.task
 
+import dev.maahdi.mavick.calendar.Clash
 import dev.maahdi.mavick.calendar.TaskCalendar
 import dev.maahdi.mavick.reminders.ReminderScheduler
 import java.time.Clock
@@ -13,8 +14,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Today's and overdue open tasks, and suggested tasks waiting for you, for the morning briefing. */
-data class Briefing(val overdue: List<TaskEntity>, val today: List<TaskEntity>, val suggestionsWaiting: Int = 0) {
+/**
+ * Today's and overdue open tasks, suggested tasks waiting for you, and today's tasks that clash with
+ * a calendar event, for the morning briefing.
+ */
+data class Briefing(
+    val overdue: List<TaskEntity>,
+    val today: List<TaskEntity>,
+    val suggestionsWaiting: Int = 0,
+    val clashes: List<Clash> = emptyList(),
+) {
     val isEmpty: Boolean get() = overdue.isEmpty() && today.isEmpty() && suggestionsWaiting == 0
 }
 

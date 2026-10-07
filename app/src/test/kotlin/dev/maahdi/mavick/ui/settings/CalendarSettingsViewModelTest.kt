@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.maahdi.mavick.calendar.CalendarProblem
 import dev.maahdi.mavick.calendar.CalendarSync
+import dev.maahdi.mavick.calendar.DeviceCalendar
 import dev.maahdi.mavick.data.MavickDatabase
 import dev.maahdi.mavick.data.settings.SettingsRepository
 import dev.maahdi.mavick.data.task.TaskDraft
@@ -114,6 +115,17 @@ class CalendarSettingsViewModelTest {
     }
 
     @Test
+    fun `every visible calendar is known, and the writable ones are picked from them`() = runTest {
+        val holidays = DeviceCalendar(5, "Holidays", "holidays@group", writable = false)
+        gateway.calendars = listOf(PERSONAL_CALENDAR, holidays)
+
+        val state = loadedViewModel().state.value
+
+        assertThat(state.allCalendars).containsExactly(PERSONAL_CALENDAR, holidays).inOrder()
+        assertThat(state.calendars).containsExactly(PERSONAL_CALENDAR)
+    }
+
+    @Test
     fun `a slow refresh cannot overwrite the answer of a newer one`() = runTest {
         val release = CompletableDeferred<Unit>()
         var first = true
@@ -177,6 +189,65 @@ class CalendarSettingsViewModelTest {
         assertThat(viewModel.state.value.permissionDenied).isTrue()
         assertThat(viewModel.state.value.picking).isFalse()
         assertThat(settings.current.calendarEnabled).isFalse()
+    }
+
+    // --- Clash warnings ---
+
+    @Test
+    fun `clash warnings can be switched on and off`() = runTest {
+        val viewModel = loadedViewModel()
+
+        viewModel.setClashCheck(true)
+        assertThat(settings.current.clashCheckEnabled).isTrue()
+
+        viewModel.setClashCheck(false)
+        assertThat(settings.current.clashCheckEnabled).isFalse()
+    }
+
+    @Test
+    fun `allowing the permission for clash warnings switches them on`() = runTest {
+        val viewModel = loadedViewModel()
+
+        viewModel.onClashPermissionResult(granted = true).join()
+
+        assertThat(settings.current.clashCheckEnabled).isTrue()
+        assertThat(viewModel.state.value.picking).isFalse()
+    }
+
+    @Test
+    fun `refusing the permission for clash warnings leaves them off and says so`() = runTest {
+        gateway.permission = false
+        val viewModel = loadedViewModel()
+
+        viewModel.onClashPermissionResult(granted = false).join()
+
+        assertThat(settings.current.clashCheckEnabled).isFalse()
+        assertThat(viewModel.state.value.permissionDenied).isTrue()
+    }
+
+    @Test
+    fun `the calendars to check are chosen in a picker and saved`() = runTest {
+        val viewModel = loadedViewModel()
+
+        viewModel.openCheckPicker().join()
+        assertThat(viewModel.state.value.pickingChecked).isTrue()
+
+        viewModel.setCheckedCalendars(setOf(WORK_CALENDAR.id))
+
+        assertThat(settings.current.clashCalendarIds).containsExactly(WORK_CALENDAR.id)
+        assertThat(viewModel.state.value.pickingChecked).isFalse()
+    }
+
+    @Test
+    fun `closing the picker of calendars to check changes nothing`() = runTest {
+        settings.update { it.copy(clashCalendarIds = setOf(PERSONAL_CALENDAR.id)) }
+        val viewModel = loadedViewModel()
+        viewModel.openCheckPicker().join()
+
+        viewModel.closeCheckPicker()
+
+        assertThat(viewModel.state.value.pickingChecked).isFalse()
+        assertThat(settings.current.clashCalendarIds).containsExactly(PERSONAL_CALENDAR.id)
     }
 
     // --- Choosing and switching off ---

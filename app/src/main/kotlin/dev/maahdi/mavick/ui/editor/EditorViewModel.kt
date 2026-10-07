@@ -5,12 +5,15 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.maahdi.mavick.AppContainer
+import dev.maahdi.mavick.calendar.CalendarOccurrence
 import dev.maahdi.mavick.data.settings.SettingsRepository
 import dev.maahdi.mavick.data.suggestion.SuggestionRepository
 import dev.maahdi.mavick.data.task.TaskDraft
 import dev.maahdi.mavick.data.task.TaskRepository
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalTime
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,8 @@ class EditorViewModel(
     taskId: String?,
     draft: TaskDraft?,
     private val suggestionId: String? = null,
+    /** The calendar events that overlap a task at this date and time (Phase 4); none while the check is off. */
+    private val findClashesAt: suspend (LocalDate, LocalTime) -> List<CalendarOccurrence> = { _, _ -> emptyList() },
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(
         when {
@@ -41,6 +46,8 @@ class EditorViewModel(
 
     val state: StateFlow<EditorState> = mutableState.asStateFlow()
 
+    private var clashCheck: Job? = null
+
     init {
         if (taskId != null) {
             viewModelScope.launch {
@@ -50,12 +57,34 @@ class EditorViewModel(
                 } else {
                     EditorState.fromTask(task, settings.current.workDays)
                 }
+                checkClashes()
             }
+        } else {
+            checkClashes()
         }
     }
 
     fun edit(change: (EditorState) -> EditorState) {
+        val before = mutableState.value
         mutableState.update { change(it).copy(showTitleError = false) }
+        val after = mutableState.value
+        if (before.dueDate != after.dueDate || before.dueTime != after.dueTime) checkClashes()
+    }
+
+    /** Looks for calendar events at the chosen date and time. A newer check replaces an older one still running. */
+    private fun checkClashes() {
+        clashCheck?.cancel()
+        val date = mutableState.value.dueDate
+        val time = mutableState.value.dueTime
+        if (date == null || time == null) {
+            mutableState.update { it.copy(clashes = emptyList()) }
+            return
+        }
+        clashCheck = viewModelScope.launch {
+            val found = findClashesAt(date, time)
+            // Only if the date and time are still the ones asked about.
+            mutableState.update { if (it.dueDate == date && it.dueTime == time) it.copy(clashes = found) else it }
+        }
     }
 
     /** Saves, then calls [onSaved]. With an empty title it shows an error instead. */
@@ -91,7 +120,16 @@ class EditorViewModel(
     companion object {
         fun factory(container: AppContainer, taskId: String?, draft: TaskDraft?, suggestionId: String?) = viewModelFactory {
             initializer {
-                EditorViewModel(container::openTasks, container::openSuggestions, container.settings, container.clock, taskId, draft, suggestionId)
+                EditorViewModel(
+                    container::openTasks,
+                    container::openSuggestions,
+                    container.settings,
+                    container.clock,
+                    taskId,
+                    draft,
+                    suggestionId,
+                    findClashesAt = { date, time -> container.openClashes().clashesAt(date, time) },
+                )
             }
         }
     }

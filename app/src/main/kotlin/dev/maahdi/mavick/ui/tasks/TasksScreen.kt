@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.maahdi.mavick.R
 import dev.maahdi.mavick.data.task.TaskEntity
+import dev.maahdi.mavick.calendar.clashSentence
 import dev.maahdi.mavick.data.task.TaskPriority
 import dev.maahdi.mavick.data.task.TaskStatus
 import dev.maahdi.mavick.time.DueFormatter
@@ -151,7 +153,7 @@ fun TasksScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                TaskList(sections, state.today, state.workDays, use24Hour, onToggleDone, onOpenTask)
+                TaskList(sections, state, use24Hour, onToggleDone, onOpenTask)
             }
         }
     }
@@ -160,12 +162,12 @@ fun TasksScreen(
 @Composable
 private fun TaskList(
     sections: List<TaskSection>,
-    today: LocalDate,
-    workDays: Set<DayOfWeek>,
+    state: TasksUiState,
     use24Hour: Boolean,
     onToggleDone: (TaskEntity) -> Unit,
     onOpenTask: (TaskEntity) -> Unit,
 ) {
+    val resources = LocalContext.current.resources
     LazyColumn(Modifier.fillMaxSize()) {
         sections.forEach { section ->
             section.title?.let { title ->
@@ -179,7 +181,17 @@ private fun TaskList(
                 }
             }
             items(section.tasks, key = { it.id }) { task ->
-                TaskRow(task, today, workDays, use24Hour, section.highlightDue, onToggleDone = { onToggleDone(task) }, onClick = { onOpenTask(task) })
+                val clash = state.clashes[task.id]?.let { clashSentence(resources, it, state.zone, use24Hour) }
+                TaskRow(
+                    task,
+                    state.today,
+                    state.workDays,
+                    use24Hour,
+                    section.highlightDue,
+                    onToggleDone = { onToggleDone(task) },
+                    onClick = { onOpenTask(task) },
+                    clash = clash,
+                )
             }
         }
     }
@@ -194,6 +206,8 @@ fun TaskRow(
     highlightDue: Boolean,
     onToggleDone: () -> Unit,
     onClick: () -> Unit,
+    /** "Clashes with Dentist at 17:00", when the task overlaps a calendar event (Phase 4). */
+    clash: String? = null,
 ) {
     val isDone = task.status == TaskStatus.DONE
     val details = listOfNotNull(
@@ -219,14 +233,19 @@ fun TaskRow(
                 textDecoration = if (isDone) TextDecoration.LineThrough else null,
             )
         },
-        supportingContent = if (details.isEmpty()) {
+        supportingContent = if (details.isEmpty() && clash == null) {
             null
         } else {
             {
-                Text(
-                    details,
-                    color = if (highlightDue && !isDone) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column {
+                    if (details.isNotEmpty()) {
+                        Text(
+                            details,
+                            color = if (highlightDue && !isDone) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (clash != null && !isDone) Text(clash, color = MaterialTheme.colorScheme.error)
+                }
             }
         },
         trailingContent = if (task.remindAt != null && !isDone) {

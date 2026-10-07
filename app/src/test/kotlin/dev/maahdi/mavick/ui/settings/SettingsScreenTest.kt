@@ -60,6 +60,10 @@ class SettingsScreenTest {
                 onPickCalendar = { calendar -> calls += "calendar pick ${calendar.id}" },
                 onClosePicker = { calls += "calendar close" },
                 onFixCalendarPermission = { calls += "calendar permission" },
+                onClashSwitch = { on -> calls += "clash switch $on" },
+                onChooseCheckedCalendars = { calls += "clash calendars" },
+                onCheckedCalendars = { ids -> calls += "clash checked ${ids.sorted()}" },
+                onCloseCheckedPicker = { calls += "clash close" },
                 onFixNotifications = { calls += "notifications" },
                 onFixBattery = { calls += "battery" },
                 onFixNotificationAccess = { calls += "access" },
@@ -445,6 +449,112 @@ class SettingsScreenTest {
 
         compose.onNodeWithText("Updating the calendar…").performScrollTo().assertExists()
         compose.onNodeWithText("4 tasks are in the calendar").assertDoesNotExist()
+    }
+
+    // --- Clash warnings ---
+
+    @Test
+    fun `the clash switch starts off and asks to be turned on`() {
+        show(working)
+
+        compose.onNodeWithText("Warn me about clashes").performScrollTo().performClick()
+
+        assertThat(calls).containsExactly("clash switch true")
+        compose.onNodeWithText("Calendars to check").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the clash section says what is read and where titles show`() {
+        show(working)
+
+        compose.onNodeWithText("Mavick reads your calendar on this phone", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("Event titles are shown only there.", substring = true).assertExists()
+    }
+
+    @Test
+    fun `with clash warnings on every calendar is checked unless some are chosen`() {
+        settings = settings.copy(clashCheckEnabled = true)
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, allCalendars = calendars, loaded = true))
+
+        compose.onNodeWithText("Every calendar").performScrollTo().assertExists()
+        compose.onNodeWithText("Calendars to check").performClick()
+
+        assertThat(calls).containsExactly("clash calendars")
+    }
+
+    @Test
+    fun `the number of calendars checked counts only calendars still there`() {
+        settings = settings.copy(clashCheckEnabled = true, clashCalendarIds = setOf(2, 99))
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, allCalendars = calendars, loaded = true))
+
+        compose.onNodeWithText("1 calendar").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `when every chosen calendar is gone the section says every calendar is checked`() {
+        settings = settings.copy(clashCheckEnabled = true, clashCalendarIds = setOf(99))
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, allCalendars = calendars, loaded = true))
+
+        compose.onNodeWithText("Every calendar").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `the picker of calendars to check lists every calendar and saves the ticked ones`() {
+        show(
+            working,
+            calendar = CalendarSettingsState(permissionGranted = true, allCalendars = calendars, loaded = true, pickingChecked = true),
+        )
+
+        compose.onNodeWithText("Check these calendars").assertExists()
+        compose.onNodeWithText("Work").performClick()
+        compose.onNodeWithText("Done").performClick()
+
+        assertThat(calls).containsExactly("clash checked [2]")
+    }
+
+    @Test
+    fun `ticking nothing in the picker means every calendar`() {
+        settings = settings.copy(clashCheckEnabled = true, clashCalendarIds = setOf(2))
+        show(
+            working,
+            calendar = CalendarSettingsState(permissionGranted = true, allCalendars = calendars, loaded = true, pickingChecked = true),
+        )
+
+        compose.onNodeWithText("Work").performClick() // untick the only one
+        compose.onNodeWithText("Done").performClick()
+
+        assertThat(calls).containsExactly("clash checked []")
+    }
+
+    @Test
+    fun `choosing every calendar in the picker clears the ticks`() {
+        settings = settings.copy(clashCheckEnabled = true, clashCalendarIds = setOf(1, 2))
+        show(
+            working,
+            calendar = CalendarSettingsState(permissionGranted = true, allCalendars = calendars, loaded = true, pickingChecked = true),
+        )
+
+        compose.onNodeWithText("Every calendar shown in the Calendar app").performClick()
+        compose.onNodeWithText("Done").performClick()
+
+        assertThat(calls).containsExactly("clash checked []")
+    }
+
+    @Test
+    fun `cancelling the picker of calendars to check saves nothing`() {
+        show(working, calendar = CalendarSettingsState(permissionGranted = true, allCalendars = calendars, loaded = true, pickingChecked = true))
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        assertThat(calls).containsExactly("clash close")
+    }
+
+    @Test
+    fun `with clash warnings on and no permission the section says so`() {
+        settings = settings.copy(clashCheckEnabled = true)
+        show(working, calendar = CalendarSettingsState(permissionGranted = false, loaded = true))
+
+        compose.onNodeWithText("The calendar permission is off", substring = true).performScrollTo().assertExists()
     }
 
     @Test

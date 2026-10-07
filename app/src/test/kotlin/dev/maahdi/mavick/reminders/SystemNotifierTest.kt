@@ -1,5 +1,6 @@
 package dev.maahdi.mavick.reminders
 
+import java.time.Instant
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
@@ -7,6 +8,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.maahdi.mavick.capture.ReadingState
+import dev.maahdi.mavick.calendar.CalendarOccurrence
+import dev.maahdi.mavick.calendar.Clash
 import dev.maahdi.mavick.data.task.Briefing
 import dev.maahdi.mavick.testing.MONDAY_10AM
 import dev.maahdi.mavick.testing.MutableClock
@@ -91,6 +94,68 @@ class SystemNotifierTest {
 
         val notification = posted(SystemNotifier.BRIEFING_TAG, SystemNotifier.BRIEFING_NOTIFICATION_ID)!!
         assertThat(notification.text(Notification.EXTRA_TEXT)).isEqualTo("1 task due today · 2 suggested tasks to review")
+    }
+
+    private fun occurrence(title: String) = CalendarOccurrence(
+        eventId = 1,
+        calendarId = 1,
+        title = title,
+        start = Instant.parse("2026-10-05T11:00:00Z"),
+        end = Instant.parse("2026-10-05T12:00:00Z"),
+        allDay = false,
+        busy = true,
+    )
+
+    @Test
+    fun `the briefing counts clashes and lists them before everything else`() {
+        val bank = task(title = "Call the bank", dueDate = today, dueTime = LocalTime.of(17, 0))
+        val briefing = Briefing(
+            overdue = listOf(task(title = "Old")),
+            today = listOf(bank, task(title = "Pay rent", dueDate = today)),
+            clashes = listOf(Clash(bank, listOf(occurrence("Dentist")))),
+        )
+
+        notifier.showBriefing(briefing)
+
+        val notification = posted(SystemNotifier.BRIEFING_TAG, SystemNotifier.BRIEFING_NOTIFICATION_ID)!!
+        assertThat(notification.text(Notification.EXTRA_TEXT)).isEqualTo("2 tasks due today · 1 overdue · 1 clash with your calendar")
+        val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)!!.map { it.toString() }
+        assertThat(lines.first()).startsWith("Clash: ")
+        assertThat(lines.first()).endsWith("Call the bank, with Dentist")
+        assertThat(lines).hasSize(4)
+    }
+
+    @Test
+    fun `a clash with several or untitled events says so briefly`() {
+        val bank = task(title = "Call the bank", dueDate = today, dueTime = LocalTime.of(17, 0))
+        val rent = task(title = "Pay rent", dueDate = today, dueTime = LocalTime.of(18, 0))
+        val briefing = Briefing(
+            overdue = emptyList(),
+            today = listOf(bank, rent),
+            clashes = listOf(
+                Clash(bank, listOf(occurrence("Dentist"), occurrence("Standup"), occurrence("Lunch"))),
+                Clash(rent, listOf(occurrence(""))),
+            ),
+        )
+
+        notifier.showBriefing(briefing)
+
+        val notification = posted(SystemNotifier.BRIEFING_TAG, SystemNotifier.BRIEFING_NOTIFICATION_ID)!!
+        assertThat(notification.text(Notification.EXTRA_TEXT)).contains("2 clashes with your calendar")
+        val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)!!.map { it.toString() }
+        assertThat(lines[0]).endsWith("Call the bank, with Dentist and 2 more")
+        assertThat(lines[1]).endsWith("Pay rent, with an event")
+    }
+
+    @Test
+    fun `the lock screen version of the briefing says nothing about clashes`() {
+        val bank = task(title = "Call the bank", dueDate = today, dueTime = LocalTime.of(17, 0))
+
+        notifier.showBriefing(Briefing(emptyList(), listOf(bank), clashes = listOf(Clash(bank, listOf(occurrence("Dentist"))))))
+
+        val publicVersion = posted(SystemNotifier.BRIEFING_TAG, SystemNotifier.BRIEFING_NOTIFICATION_ID)!!.publicVersion
+        assertThat(publicVersion.text(Notification.EXTRA_TITLE)).isEqualTo("Mavick: your day")
+        assertThat(publicVersion.text(Notification.EXTRA_TEXT)).isNull()
     }
 
     @Test

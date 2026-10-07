@@ -327,6 +327,30 @@ Do each step in Mavick, then open the Calendar app (or Google Calendar) and look
 - [ ] Change the phone's time zone (Settings › System › Date & time), look at an event, change it
       back: the event keeps the task's clock time (5 pm stays 5 pm).
 
+### Clash warnings (part 2)
+
+In Google Calendar (or the Calendar app) make a timed event for today, say *Dentist* from 17:00 to 18:00,
+in a calendar that shows on the phone.
+
+- [ ] Settings › Calendar › **Warn me about clashes**: switch on. If the calendar permission wasn't
+      given yet, Android asks (allow). **Calendars to check** says *Every calendar*.
+- [ ] Add a task `Call the bank today 5.15pm`. In the lists its row has a red line
+      **"Clashes with Dentist at 17:00"** (the time may show as 5:00 PM).
+- [ ] Open that task in the editor: the same warning is under the time. Change the time to 7 pm: it
+      goes. Back to 5.15 pm: it returns.
+- [ ] A new task for 4 pm (it would end at 4:30): **no** warning (the Dentist starts at 5).
+- [ ] An **all-day** event today (a holiday, say) does not cause a warning. An event set to *Free*
+      doesn't either. One you **declined** doesn't.
+- [ ] Mavick's own copy of a task in your calendar (part 1 on) is not a clash with itself.
+- [ ] **Calendars to check**: tick only a different calendar; the Dentist warning goes. Untick all:
+      back to *Every calendar*, and it returns.
+- [ ] Morning briefing: set the briefing time a minute ahead, or wait until morning. It shows
+      **"1 clash with your calendar"** and a line "Clash: 17:00 Call the bank, with Dentist" first. The
+      lock-screen version still says only "Mavick: your day".
+- [ ] Switch clash warnings off: the warnings disappear from the list and the editor.
+- [ ] Take the calendar permission away in App info: Settings says so, with **Fix**; no warning
+      appears and nothing crashes.
+
 ### Results (Phase 4, part 1)
 
 | Item | Pixel 7 Pro | Poco X7 Pro |
@@ -339,5 +363,7 @@ Do each step in Mavick, then open the Calendar app (or Google Calendar) and look
 | Permission off: message, Fix, tidy-up after allowing | | |
 | Time zone change | | |
 | Events show as private, no alarm, no notes | | |
+| Clash warning: list row, editor, briefing; free, all-day and declined events ignored | | |
+| Calendars to check, and permission off | | |
 | On-phone calendar tests pass (`test.ps1 -OnPhone`) | | |
 | Problems seen | | |
