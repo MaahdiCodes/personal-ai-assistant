@@ -6,6 +6,7 @@ import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -74,9 +75,12 @@ class SuggestionWorker(
         private const val TAG = "MavickAI"
 
         /** One thread at background priority. The runtime's own threads are made from it and inherit that. */
-        fun lowPriorityThread(): CoroutineDispatcher = Executors.newSingleThreadExecutor { task ->
+        fun lowPriorityThread(): ExecutorCoroutineDispatcher = aiThread(Process.THREAD_PRIORITY_BACKGROUND)
+
+        /** One thread at [priority] (an android.os.Process value). The app always uses [lowPriorityThread]. */
+        fun aiThread(priority: Int): ExecutorCoroutineDispatcher = Executors.newSingleThreadExecutor { task ->
             Thread({
-                Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+                Process.setThreadPriority(priority)
                 task.run()
             }, "MavickAI")
         }.asCoroutineDispatcher()

@@ -16,17 +16,26 @@
     The labelled file. Default: the newest .csv directly in eval\private.
 .PARAMETER Fetch
     Copy the newest export from the phone's Download folder into eval\private, then delete it there.
+.PARAMETER Threads
+    CPU threads for the model, 1 to 8. Leave out to run as the app does (2). For measuring speed only.
+.PARAMETER Priority
+    'background' (as the app runs), 'low' (one step above background) or 'normal'. Leave out to run as
+    the app does. For measuring speed only.
 .EXAMPLE
     .\scripts\eval.ps1 -Fetch -Phone pixel
 .EXAMPLE
     .\scripts\eval.ps1 -Phone pixel
 .EXAMPLE
     .\scripts\eval.ps1 -Phone pixel -Set eval\sample.csv
+.EXAMPLE
+    .\scripts\eval.ps1 -Phone pixel -Set eval\sample.csv -Threads 4 -Priority normal
 #>
 param(
     [string] $Phone = '',
     [string] $Set = '',
-    [switch] $Fetch
+    [switch] $Fetch,
+    [ValidateRange(1, 8)] [int] $Threads,
+    [ValidateSet('background', 'low', 'normal')] [string] $Priority
 )
 . "$PSScriptRoot\_common.ps1"
 
@@ -84,12 +93,18 @@ try {
     Invoke-Program -Path $Adb -Arguments @('-s', $serial, 'push', (Resolve-Path $Set).Path, $phoneSet) | Out-Null
     Invoke-Program -Path $Adb -Arguments @('-s', $serial, 'shell', 'chmod', '644', $phoneSet) | Out-Null
 
+    # Only what was asked for is passed; the test runs as the app does otherwise.
+    $runOptions = @()
+    if ($PSBoundParameters.ContainsKey('Threads')) { $runOptions += @('-e', 'threads', "$Threads") }
+    if ($PSBoundParameters.ContainsKey('Priority')) { $runOptions += @('-e', 'priority', $Priority) }
+
     Write-Step 'Running the check: seconds per message. Keep the phone unlocked and charging.'
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        & $Adb -s $serial shell am instrument -w -r -e class dev.maahdi.mavick.ai.ExtractionEvalRun `
-            -e evalSet $phoneSet -e model $PhoneTestModel "$DebugAppPackage.test/androidx.test.runner.AndroidJUnitRunner" 2>&1 |
+        $instrument = @('-s', $serial, 'shell', 'am', 'instrument', '-w', '-r', '-e', 'class', 'dev.maahdi.mavick.ai.ExtractionEvalRun',
+            '-e', 'evalSet', $phoneSet, '-e', 'model', $PhoneTestModel) + $runOptions + @("$DebugAppPackage.test/androidx.test.runner.AndroidJUnitRunner")
+        & $Adb @instrument 2>&1 |
             ForEach-Object {
                 $line = "$_"
                 if ($line -match 'INSTRUMENTATION_STATUS: progress=(.+)') { Write-Host "  $($Matches[1])" }

@@ -3,9 +3,12 @@ package dev.maahdi.mavick.ai
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.ResponseFormat
 import com.google.ai.edge.litertlm.SamplerConfig
@@ -18,7 +21,11 @@ import java.io.File
  * Light on the phone: [THREADS] CPU threads, created from Mavick's low-priority AI thread so they
  * run at its priority, and a fresh, short conversation per message.
  */
-class LiteRtLmModel private constructor(private val engine: Engine) : LanguageModel {
+class LiteRtLmModel private constructor(
+    private val engine: Engine,
+    /** Told how each answer's time was spent; null in the app, which never measures. */
+    private val onTimings: ((ModelTimings) -> Unit)?,
+) : LanguageModel {
     /** Cleared if the runtime refuses the JSON schema; answers are then only checked afterwards. */
     private var schemaAccepted = true
 
@@ -44,8 +51,26 @@ class LiteRtLmModel private constructor(private val engine: Engine) : LanguageMo
         )
         engine.createConversation(config).use { conversation ->
             val reply = conversation.sendMessage(request.prompt, responseFormat = schema?.let(ResponseFormat::json))
+            onTimings?.let { report -> timingsOf(conversation)?.let(report) }
             return reply.contents.contents.filterIsInstance<Content.Text>().joinToString("") { it.text }
         }
+    }
+
+    /** A measurement that fails must never cost the answer. Experimental in LiteRT-LM, whose version is pinned (§0.8). */
+    @OptIn(ExperimentalApi::class)
+    private fun timingsOf(conversation: Conversation): ModelTimings? = try {
+        val info = conversation.getBenchmarkInfo()
+        ModelTimings(
+            promptTokens = info.lastPrefillTokenCount,
+            promptTokensPerSecond = info.lastPrefillTokensPerSecond,
+            answerTokens = info.lastDecodeTokenCount,
+            answerTokensPerSecond = info.lastDecodeTokensPerSecond,
+            firstTokenSeconds = info.timeToFirstTokenInSecond,
+        )
+    } catch (e: LiteRtLmJniException) {
+        null
+    } catch (e: IllegalStateException) {
+        null
     }
 
     override fun close() = engine.close()
@@ -53,6 +78,9 @@ class LiteRtLmModel private constructor(private val engine: Engine) : LanguageMo
     companion object {
         /** At most two CPU threads (docs/PLAN.md §5.8), so the phone stays responsive. */
         const val THREADS = 2
+
+        /** The most the accuracy check may try: the phones have 8 cores. */
+        const val MAX_THREADS = 8
 
         /** Enough for three items of JSON; a runaway answer stops here. */
         const val MAX_OUTPUT_TOKENS = 256
@@ -65,18 +93,24 @@ class LiteRtLmModel private constructor(private val engine: Engine) : LanguageMo
 
         /**
          * Loads [modelFile]: seconds of work, so call it on the AI thread. [cacheDir] keeps the
-         * runtime's prepared weights, so later loads are faster; Android may clear it.
+         * runtime's prepared weights, so later loads are faster; Android may clear it. The app
+         * always uses the defaults; the accuracy check may try other [threads] and ask for [onTimings].
          */
-        fun load(modelFile: File, cacheDir: File): LiteRtLmModel {
+        @OptIn(ExperimentalApi::class)
+        fun load(modelFile: File, cacheDir: File, threads: Int = THREADS, onTimings: ((ModelTimings) -> Unit)? = null): LiteRtLmModel {
+            require(threads in 1..MAX_THREADS) { "threads must be 1 to $MAX_THREADS, not $threads" }
+            // The runtime measures only with this flag on, set before the engine exists. It is
+            // process-wide, so it is never turned on in the app.
+            if (onTimings != null) ExperimentalFlags.enableBenchmark = true
             cacheDir.mkdirs()
-            val engine = Engine(EngineConfig(modelPath = modelFile.path, backend = Backend.CPU(threadCount = THREADS), cacheDir = cacheDir.path))
+            val engine = Engine(EngineConfig(modelPath = modelFile.path, backend = Backend.CPU(threadCount = threads), cacheDir = cacheDir.path))
             try {
                 engine.initialize()
             } catch (e: Throwable) {
                 engine.close()
                 throw e
             }
-            return LiteRtLmModel(engine)
+            return LiteRtLmModel(engine, onTimings)
         }
     }
 }

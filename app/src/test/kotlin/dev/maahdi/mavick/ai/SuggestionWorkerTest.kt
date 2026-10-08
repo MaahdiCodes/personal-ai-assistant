@@ -1,9 +1,12 @@
 package dev.maahdi.mavick.ai
 
+import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -89,6 +92,15 @@ class SuggestionWorkerTest {
         advanceTimeBy(2_000)
         runCurrent()
         assertThat(unloads).isEqualTo(1)
+    }
+
+    @Test
+    fun `the AI thread runs at the priority it was made with, background for the app`() {
+        fun priorityOn(dispatcher: ExecutorCoroutineDispatcher): Int =
+            dispatcher.use { runBlocking(it) { Process.getThreadPriority(Process.myTid()) } }
+
+        assertThat(priorityOn(SuggestionWorker.lowPriorityThread())).isEqualTo(Process.THREAD_PRIORITY_BACKGROUND)
+        assertThat(priorityOn(SuggestionWorker.aiThread(Process.THREAD_PRIORITY_DEFAULT))).isEqualTo(Process.THREAD_PRIORITY_DEFAULT)
     }
 
     @Test

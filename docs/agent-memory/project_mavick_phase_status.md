@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ddd8a6d4-1d96-4101-96d8-89e10b16230f
-  modified: 2026-10-08T12:24:08.771Z
+  modified: 2026-10-08T13:06:47.540Z
 ---
 
 Mavick is the user's private on-device Android assistant. Source of truth: docs/PLAN.md section 0 ("Start here").
@@ -19,6 +19,7 @@ Mavick is the user's private on-device Android assistant. Source of truth: docs/
 - **2026-10-07: first `test.ps1 -OnPhone` run, on the Pixel.** `install.ps1 -Phone pixel` (0.5.0) and the full automated suite both ran clean: 1,081 PC tests, Lint, permission/read-only checks, and 22 on-phone instrumented tests, including `CalendarGatewayDeviceTest` (Phase 4) run for the first time. 2 tests skipped as expected (no AI model imported). Fixed a flaky `TasksViewModelTest` found along the way (a cross-thread race between Room's query executor and the test thread; needed a `CopyOnWriteArrayList`). Pushed to `develop` (commit c7dfa2c). This automated pass does **not** cover PHONE_CHECKLIST.md sections 10-11 (calendar, clashes, widget, tile, backup/restore) — that's a manual, hands-on walkthrough on the real phone, which Claude cannot drive or verify itself (Mavick blocks screenshots of itself, by design, so there's no way to see the screen even via adb).
 - 2026-10-07: user reports the calendar switch-on works (permission, picking a calendar, events appear). Rest of §10 not reported yet.
 - **2026-10-08 (Pixel): the AI runtime works on the phone.** `LiteRtLmDeviceTest` passes (model pushed with `push-model.ps1 -ForTests`; the Gemma file is at `%USERPROFILE%\Downloads\gemma3-1b-it-int4.litertlm`). Sample accuracy check (`eval.ps1 -Set eval\sample.csv`, 11 made-up messages): AI precision 100%, recall 85.7%, but **about 30 s per message (target 10 s)**, and titles and dates no better than the simple rules. The likely cause: 2 threads at background priority, which Android runs on the small cores, plus re-reading the system prompt for every message. The user must decide on speed (PLAN §0.3 item 4). Widget and tile not placed yet. No crashes on record.
+- **2026-10-08, AI speed measured** (eval-only `-Threads`/`-Priority` switches; report shows prompt-reading vs answer-writing time). Median per message on the sample: 2 threads background (the app) 32.3 s; 4 background 35.5 s; 2 normal 13.5 s; 4 normal 15.4 s; **2 "low" (one step above background) 13.9 s**. Background priority alone costs 2.3x; more threads don't help; LiteRT-LM 0.16.1 can't reuse the system prompt. Recommended to the user: switch the app to "low" priority, then check Settings > Suggestions' real figure and a day's battery. Still over 10 s: next levers are a shorter prompt and the ~3.6 s per-conversation set-up. 1,098 PC tests. The test model stays at /data/local/tmp/mavick on the Pixel for more eval runs; eval.ps1 leaves Mavick Debug installed, so uninstall it after measuring.
 - `eval/private/` is off limits even for sample-set reports (the auto-mode classifier blocked reading details.csv): use only the printed report numbers.
 - No phase has passed its full **manual** phone check yet. No `phase-N` tags exist.
 

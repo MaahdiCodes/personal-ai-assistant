@@ -74,9 +74,24 @@ Dates right: 25 of 32
 Unusable answers or errors: 2
 Model load: 4.2 s
 Time per message (AI only): median 6.1 s, 90% within 8.9 s, slowest 12.0 s (meets the 10.0 s target)
+Run: 2 CPU threads, background priority (as the app runs)
+Where the time goes (medians of 70 model calls, retries included):
+  Reading the prompt: 332 tokens at 110.0 tokens/s, 3.0 s
+  Writing the answer: 45 tokens at 20.0 tokens/s, 2.3 s
+  First word of the answer after: 3.1 s
 ```
 
 A second report below it does the same with the simple rules, to show what the AI adds.
+
+**Measuring speed only.** `-Threads 1..8` and `-Priority background|low|normal` run the model
+differently from the app, to see what each costs; the report's `Run:` line says which. Leave both
+out to measure the app as it is. Run the same settings twice in a row to check that a warm phone
+isn't skewing the comparison.
+
+```powershell
+.\scripts\eval.ps1 -Phone pixel -Set eval\sample.csv -Priority low
+.\scripts\eval.ps1 -Phone pixel -Set eval\sample.csv -Threads 4 -Priority normal
+```
 
 Keep the phone unlocked and charging while it runs: about 10 seconds per message that passes the
 prefilter.

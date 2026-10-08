@@ -51,6 +51,24 @@ class LiteRtLmDeviceTest {
         }
     }
 
+    /** The accuracy check's timing breakdown depends on the runtime measuring each answer. */
+    @Test
+    fun aMeasuredModelReportsWhereEachAnswersTimeWent() {
+        val modelFile = File(TEST_MODEL_PATH)
+        assumeTrue("No test model: run scripts/push-model.ps1 -ForTests", modelFile.canRead())
+        val timings = mutableListOf<ModelTimings>()
+
+        LiteRtLmModel.load(modelFile, cacheDir, onTimings = { timings += it }).use { model ->
+            GemmaExtractor(model).extract(ModelManager.sample(LocalDateTime.now()))
+        }
+
+        assertThat(timings).isNotEmpty()
+        assertThat(timings.first().promptTokens).isGreaterThan(0)
+        assertThat(timings.first().answerTokens).isGreaterThan(0)
+        assertThat(timings.first().promptTokensPerSecond).isGreaterThan(0.0)
+        assertThat(timings.first().answerTokensPerSecond).isGreaterThan(0.0)
+    }
+
     private companion object {
         /** Where scripts/push-model.ps1 -ForTests puts the model; readable by test apps. */
         const val TEST_MODEL_PATH = "/data/local/tmp/mavick/model.litertlm"

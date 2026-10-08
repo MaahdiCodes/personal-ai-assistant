@@ -1,4 +1,4 @@
-- [Mavick phase status](project_mavick_phase_status.md) — Phases 0-5 core coded; on-phone tests and AI runtime pass on the Pixel (2026-10-08); AI ~30 s/msg; manual §10-11 pending
+- [Mavick phase status](project_mavick_phase_status.md) — Phases 0-5 core coded; AI runs on the Pixel, 32 s/msg, 13.9 s at "low" priority (decision pending); manual §10-11 pending
 - [Update memory every phase](feedback_mavick_update_memory_every_phase.md) — keep memory current at each phase end, not only the plan
 - [Explain the phase first](feedback_mavick_explain_phase_first.md) — when starting a phase, say what it builds, then ask only the user's decisions
 - [Work on another PC](project_mavick_other_pc.md) — pull, run scripts/sync-memory.ps1, follow docs/SETUP_NEW_PC.md
