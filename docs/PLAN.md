@@ -1,8 +1,8 @@
 # Mavick — Personal AI Assistant — Plan
 
 > **Status:** Phases 0–3 are coded. **Phase 4 (calendar) is coded** (tasks to the calendar, clash warnings, widget and tile), and **the core of Phase 5 (encrypted backup and restore with merge)** is coded. 1,081 PC tests pass. Phases 0–3 run on the Pixel 7 Pro to the extent checked so far. **The on-phone automated test suite (`test.ps1 -OnPhone`) now also passes on the Pixel (2026-10-07)**, including `CalendarGatewayDeviceTest` (Phase 4), run for the first time; no phase has had its full **manual** phone check yet (PHONE_CHECKLIST.md).
-> **Last updated:** 2026-10-07, after the first `test.ps1 -OnPhone` run on the Pixel.
-> **Next step:** the user works through PHONE_CHECKLIST.md sections 10 and 11 by hand on the Pixel (calendar, clashes, widget, tile, then backup and restore) and reports the results tables. Then: keyword search ("ask my assistant"), the Phase 6 merge core, imports the Gemma 3 1B model if not done, accuracy check on real labelled messages (eval/README.md), tags.
+> **Last updated:** 2026-10-08, after the AI runtime's first on-phone test and the sample accuracy check (§0.1).
+> **Next step:** the user finishes PHONE_CHECKLIST.md sections 10 and 11 by hand on the Pixel (rest of the calendar checks, clashes, widget, tile, then backup and restore). In parallel, decide how to handle the AI's speed (about 30 s per message against a 10 s target, §0.3). Then: the accuracy check on real labelled messages (eval/README.md), keyword search ("ask my assistant"), the Phase 6 merge core, the Poco, tags.
 
 This document is the single source of truth for the project. **§0 is the hand-over for anyone, person or AI session, picking up the work.** Keep it current: update §0 and the status tables after every piece of work.
 
@@ -71,6 +71,9 @@ This document is the single source of truth for the project. **§0 is the hand-o
 - **Versions:** app `versionCode 5`, `versionName 0.5.0`; database version 5.
 - **First phone test (Pixel 7 Pro, 2026-10-06):** the Gemma 3 1B model copied with `push-model.ps1` (SHA-256 matched) and imported in Settings. Two test messages each made a suggestion. Found: a suggestion's title copied the message's wording and ran on ("…is mentioned"), and the time in the title didn't match the sent text, so check the due time on the card. Not yet diagnosed; the accuracy check (eval/README.md) is the place to measure it. Do not change the prompt until the user has checked the due times.
 - **First `test.ps1 -OnPhone` run (Pixel 7 Pro, 2026-10-07):** `install.ps1 -Phone pixel` (0.5.0) and `test.ps1 -OnPhone -Phone pixel` both ran clean. All 1,081 PC tests, Lint, and the permission and read-only checks passed; on the phone, 22 instrumented tests passed, including `EncryptedDatabaseTest`, `AndroidKeystoreKeyWrapperTest`, `ReminderDeliveryTest`, `MessageCaptureDeviceTest` and **`CalendarGatewayDeviceTest`** (all run for the first time). 2 tests skipped as expected (`ExtractionEvalRun`, `LiteRtLmDeviceTest`: no AI model imported yet). Along the way, found and fixed a genuine flaky PC test: `TasksViewModelTest`'s "a new task is checked as soon as it is added" used a plain `mutableListOf` read on the test thread while Room's own query executor thread wrote to it from `findClashes`, occasionally throwing `ConcurrentModificationException`; switched it to a `CopyOnWriteArrayList`. Unrelated to device testing, but `test.ps1` must pass before anything else runs. Sections 10 and 11 of PHONE_CHECKLIST.md (the manual calendar, clash, widget, tile, backup and restore walkthrough) still need the user's own hands on the phone — Mavick blocks screenshots of itself, so there is no way to drive or verify that part from here.
+- **Calendar switched on (Pixel, 2026-10-07):** the user reports the permission prompt, picking a calendar and events appearing all work. The rest of checklist §10 is not reported yet.
+- **AI on the phone (Pixel, 2026-10-08):** `push-model.ps1 -ForTests` and `test.ps1 -OnPhone` ran `LiteRtLmDeviceTest` for the first time: it passes, so the runtime works on the phone. The release app already holds an imported model (about 1 GB of data plus a 486 MB runtime cache). `eval.ps1 -Set eval\sample.csv` (11 made-up messages): AI precision 100%, recall 85.7%, titles close 3 of 6, dates right 4 of 5, no unusable answers, model load 8.7 s, **about 30 s per message (target 10 s)**. The simple rules scored the same precision and recall with titles 5 of 6 and dates 5 of 5. Eleven messages prove little, but the AI is not yet better than the rules here. The slowness fits the design: 2 CPU threads (`LiteRtLmModel.THREADS`) on a `THREAD_PRIORITY_BACKGROUND` thread (`SuggestionWorker`), which Android runs on the small cores, and a fresh conversation per message, so the whole system prompt is read again every time. Decision pending (§0.3).
+- **Pixel state (2026-10-08, read over adb, no content):** notification access on, calendar permissions granted, battery Unrestricted, no crashes or freezes on record, 1 service (the listener), 0 jobs, 2 alarms. The widget and the "New task" tile are not placed yet.
 
 ### 0.2 Waiting on the user
 
@@ -87,7 +90,7 @@ This document is the single source of truth for the project. **§0 is the hand-o
 1. **Recordings in:** check the parsers against them (Robolectric tests that load each recording). Add WhatsApp account detection from the field the recordings show, adjust the noise texts, and confirm where long messages are cut. Turn chosen recordings into committed fixtures with fake content only and phone numbers replaced (shortcut IDs contain them).
 2. **Phone-check results:** record them in §7 and the `usage.ps1` numbers in §5.8. Fix anything that failed. The Poco (HyperOS) is the most likely to stop the listener or delay alarms (§6).
 3. **Tags:** `phase-1`, then `phase-2`, on `main`, and push them.
-4. **Phase 3 on the phone:** fix what the checks find. First suspects: R8 in the release build, test apps reading `/data/local/tmp`, constrained JSON with Gemma 3 1B. Tune the prompt and prefilter with the accuracy report until precision ≥ 85% and recall ≥ 70%, then tag `phase-3`. (Phase 4 was started before this, at the user's request, §10; auto-add stays out until these numbers are good.)
+4. **Phase 3 on the phone:** fix what the checks find. The runtime and test apps reading `/data/local/tmp` are confirmed working (2026-10-08); R8 in the release build is confirmed only if Settings › Suggestions › Check says it works. **Speed (about 30 s per message, target 10 s) needs a decision:** measure first, with an eval-only switch for thread count and priority, to see how much comes from the small cores and how much from reading the system prompt again for every message. Then choose: keep background priority and accept slower suggestions, use more threads or normal priority only while charging, or reuse the system prompt between messages if LiteRT-LM allows it. Tune the prompt and prefilter with the accuracy report until precision ≥ 85% and recall ≥ 70%, then tag `phase-3`. Group-chat messages not addressed to the user (a vendor's pitch to a whole group, answered by someone else) became suggestions on 2026-10-07: label such messages in the accuracy set before deciding on a "mentioned or replied to" rule. (Phase 4 was started before this, at the user's request, §10; auto-add stays out until these numbers are good.)
 5. ~~Phase 4 part 3: widget and Quick Settings tile~~ (done 2026-10-07; §5.9). Phone-check results for part 1 may change the design of these: look at them first.
 **Work that needs no phone** (the user wants these finished before the phone checks, 2026-10-07), in this order:
    1. ✅ Phase 4 part 2: clashes (§5.9), done 2026-10-07.
@@ -750,14 +753,14 @@ Times assume part-time work, with Claude writing most of the code.
 | Item | Status |
 |---|---|
 | Prefilter, context, AI and rules extractors, JSON checks, dates, near-duplicates | ✅ Built and tested on the PC |
-| On-device runtime (LiteRT-LM 0.16.1), model import / check / remove, crash and battery guards | ✅ Built. ⏳ Never run on a phone |
+| On-device runtime (LiteRT-LM 0.16.1), model import / check / remove, crash and battery guards | ✅ Built. `LiteRtLmDeviceTest` passes on the Pixel (2026-10-08) |
 | Suggested tasks screen, banner, notification, briefing, Settings › Suggestions | ✅ Built, with Compose UI tests |
 | Database version 4 (suggestion table), migration test | ✅ |
 | Keep Takeout import | ✅ Built against Takeout's layout with made-up exports. ⏳ Check with a real export |
 | Accuracy check: export, eval.ps1, push-model.ps1, on-phone runner | ✅ Built. ⏳ Labelled set and report |
 | PC tests + Lint | ✅ 704 tests, Lint: no issues |
 | Release APK | ✅ 25.6 MB (budget raised to 30 MB). Same 4 permissions, 1 service |
-| Targets: precision ≥ 85%, recall ≥ 70%, ≤ 10 s per message, battery, warmth | ⏳ On the phones |
+| Targets: precision ≥ 85%, recall ≥ 70%, ≤ 10 s per message, battery, warmth | ⏳ Made-up sample on the Pixel (2026-10-08): precision 100%, recall 85.7%, **about 30 s per message (misses 10 s)**. Real labelled messages still to do |
 
 **Phase 5 progress (2026-10-07)**
 

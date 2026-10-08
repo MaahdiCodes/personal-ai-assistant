@@ -110,10 +110,10 @@ the screen with the other phone.
 
 | Item | Pixel 7 Pro | Poco X7 Pro |
 |---|---|---|
-| Android version | | |
-| Install OK | | |
+| Android version | 17 | |
+| Install OK | ✅ 0.5.0 (2026-10-07) | |
 | Health all ✓ | | |
-| On-phone tests pass | | |
+| On-phone tests pass | ✅ 2026-10-07/08: 22 tests, plus the AI runtime test once the model was pushed | |
 | Quick-add + Keep share OK | | |
 | Basic reminder on time | | |
 | Screen off 1 h on time | | |
@@ -122,11 +122,11 @@ the screen with the other phone.
 | Time-zone change | | |
 | After force-stop | | |
 | Morning briefing | | |
-| App size (usage.ps1) | | |
-| Data + cache | | |
-| Memory while open | | |
-| CPU while idle and open | | |
-| Background services / jobs | | |
+| App size (usage.ps1) | 25.7 MB | |
+| Data + cache | 1,048 MB + 486 MB, with the AI model imported (the cache is the runtime's prepared model, which Android may clear) | |
+| Memory while open | 9.7 MB with only the listener running; not yet measured with the app on screen | |
+| CPU while idle and open | 0.0% idle | |
+| Background services / jobs | 1 (the listener) / 0 jobs; 2 alarms | |
 | Developer settings off again (section 7) | | |
 | Problems seen | | |
 
@@ -270,10 +270,10 @@ Still no internet: the model arrives as a file from the PC.
 |---|---|---|
 | Rules suggestion, notification, Add / Undo | | |
 | Model import: time to copy, check result and time | | |
-| AI suggestion seconds (Settings) | | |
+| AI suggestion seconds (Settings) | Accuracy check on `eval/sample.csv`: about 30 s per message (target 10 s), model load 8.7 s | |
 | Battery Saver pause and resume | | |
 | Keep Takeout import | | |
-| On-phone AI tests pass | | |
+| On-phone AI tests pass | ✅ 2026-10-08 (`LiteRtLmDeviceTest`) | |
 | Memory with the model loaded / a minute later | | |
 | Battery use over a day, warmth | | |
 | Accuracy check: precision / recall / seconds | | |
@@ -376,7 +376,7 @@ in a calendar that shows on the phone.
 
 | Item | Pixel 7 Pro | Poco X7 Pro |
 |---|---|---|
-| Permission prompt, calendar list, picking a calendar | | |
+| Permission prompt, calendar list, picking a calendar | ✅ 2026-10-07 | |
 | Event appears, edits, done / undo, delete / undo, repeat | | |
 | Date-only task: no event; adding a time creates it | | |
 | Event deleted in Calendar app: stays gone until the task changes | | |
@@ -390,7 +390,7 @@ in a calendar that shows on the phone.
 | Widget after restart before unlock; how stale after midnight | | |
 | Quick Settings tile: add it, tap it, locked phone | | |
 | usage.ps1: services (expect 2), alarms, jobs | | |
-| On-phone calendar tests pass (`test.ps1 -OnPhone`) | | |
+| On-phone calendar tests pass (`test.ps1 -OnPhone`) | ✅ 2026-10-07 | |
 | Problems seen | | |
 
 ## 11. Phase 5: backup and restore
